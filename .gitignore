@@ -1,0 +1,23 @@
+# Credenciales y claves - NUNCA subir
+.env
+*.session
+
+# Datos sensibles
+data/
+*.json
+!data/.gitkeep
+
+# Logs
+logs/
+!logs/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+
+# Sistema
+.DS_Store
+Thumbs.db

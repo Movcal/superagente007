@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Superagente007 | Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+
+:root {
+  --bg:       #0d1117;
+  --card:     #161b22;
+  --card2:    #1c2128;
+  --border:   #30363d;
+  --gold:     #f0b90b;
+  --green:    #3fb950;
+  --red:      #f85149;
+  --orange:   #ff9800;
+  --blue:     #58a6ff;
+  --text:     #e6edf3;
+  --muted:    #8b949e;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  min-height: 100vh;
+}
+
+/* ── HEADER ─────────────────────────────── */
+.header {
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.logo {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--gold);
+  letter-spacing: -0.5px;
+}
+.logo span { color: var(--text); font-weight: 300; }
+
+.status-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(63,185,80,.12);
+  border: 1px solid rgba(63,185,80,.3);
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--green);
+  margin-left: 16px;
+}
+.dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: pulse 2s infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.refresh-chip {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+/* ── LAYOUT ─────────────────────────────── */
+.main {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px 24px;
+}
+
+.card-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.card-title::before {
+  content:'';
+  display: inline-block;
+  width: 3px; height: 14px;
+  background: var(--gold);
+  border-radius: 2px;
+}
+
+/* ── KPIs ────────────────────────────────── */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 14px;
+}
+
+.kpi-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 20px;
+}
+.kpi-label {
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+.kpi-value {
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--text);
+}
+.kpi-value.gold  { color: var(--gold); }
+.kpi-value.green { color: var(--green); }
+.kpi-sub {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+
+/* ── POSITIONS ───────────────────────────── */
+.position-card {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin-bottom: 10px;
+}
+.position-card:last-child { margin-bottom: 0; }
+
+.pos-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.pos-symbol {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--gold);
+}
+.tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.tag {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.tag.green { border-color:rgba(63,185,80,.4); color:var(--green); background:rgba(63,185,80,.08); }
+.tag.gold  { border-color:rgba(240,185,11,.4); color:var(--gold); background:rgba(240,185,11,.08); }
+
+.reasoning-box {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.7;
+  font-family: 'Courier New', monospace;
+  white-space: pre-wrap;
+  max-height: 130px;
+  overflow-y: auto;
+}
+
+.empty-state {
+  text-align: center;
+  color: var(--muted);
+  padding: 32px;
+  font-size: 13px;
+}
+
+/* ── MARKET GRID ─────────────────────────── */
+.market-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+/* Fear & Greed */
+.fg-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.fg-svg { width: 100%; max-width: 240px; }
+.fg-scale {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 240px;
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* BTC Dominance */
+.big-pct {
+  font-size: 58px;
+  font-weight: 900;
+  color: var(--gold);
+  line-height: 1;
+}
+.dom-bar {
+  height: 8px;
+  background: var(--border);
+  border-radius: 4px;
+  margin: 10px 0 6px;
+  overflow: hidden;
+}
+.dom-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--gold), var(--orange));
+  transition: width 1.2s ease;
+}
+.dom-legend {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.agent-quote {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.7;
+  border-left: 3px solid var(--gold);
+  padding-left: 12px;
+  margin-top: 14px;
+}
+
+/* ── STABLECOINS ─────────────────────────── */
+.stables-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+}
+.metric-name { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+.metric-val  { font-size: 30px; font-weight: 800; }
+.mc-bar {
+  height: 10px;
+  background: var(--border);
+  border-radius: 5px;
+  margin: 8px 0 4px;
+  overflow: hidden;
+}
+.mc-fill {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 1.2s ease;
+}
+.div-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 10px;
+  padding: 8px 16px;
+  font-weight: 800;
+  font-size: 14px;
+  border: 1px solid;
+  margin-top: 14px;
+}
+.legend-box {
+  margin-top: 20px;
+  padding: 14px;
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 2;
+}
+
+/* ── NARRATIVES (placeholder) ────────────── */
+.narratives-wrapper { position: relative; }
+.narratives-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  filter: blur(2px);
+  opacity: .45;
+  pointer-events: none;
+}
+.nar-card {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px;
+}
+.nar-title { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+.nar-desc  { font-size: 12px; color: var(--muted); margin-bottom: 12px; line-height: 1.5; }
+.nar-stats { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.pro-overlay {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(13,17,23,.92);
+  border: 1px solid var(--gold);
+  border-radius: 14px;
+  padding: 22px 32px;
+  text-align: center;
+  backdrop-filter: blur(6px);
+  z-index: 10;
+  min-width: 320px;
+}
+
+/* ── DECISIONS + LOG ─────────────────────── */
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.dec-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 14px;
+  background: var(--card2);
+  border-radius: 8px;
+  border-left: 3px solid var(--border);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.dec-item:last-child { margin-bottom: 0; }
+.dec-item.compra    { border-left-color: var(--green); }
+.dec-item.rechazado { border-left-color: var(--red); }
+.dec-item.evaluando { border-left-color: var(--gold); }
+.dec-time {
+  color: var(--muted);
+  font-size: 10px;
+  white-space: nowrap;
+  min-width: 136px;
+}
+
+.log-box {
+  background: #010409;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  line-height: 1.8;
+  max-height: 260px;
+  overflow-y: auto;
+  color: var(--muted);
+}
+.ll      { display: block; }
+.ll.ag   { color: var(--blue); }
+.ll.dec  { color: var(--gold); }
+.ll.exec { color: var(--green); }
+.ll.err  { color: var(--red); }
+
+@media (max-width: 900px) {
+  .kpi-grid, .market-grid, .stables-grid, .two-col, .narratives-grid {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div style="display:flex; align-items:center">
+    <div class="logo">SUPER<span>AGENTE</span>007</div>
+    <div class="status-badge">
+      <div class="dot"></div>
+      <span id="statusText">ACTIVO</span>
+    </div>
+  </div>
+  <div class="header-right">
+    <span>Último ciclo: <strong id="lastCycle" style="color:var(--text)">—</strong></span>
+    <div class="refresh-chip">⟳ <span id="countdown">30</span>s</div>
+  </div>
+</header>
+
+<main class="main">
+
+  <!-- KPIs -->
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-label">Capital Total</div>
+      <div class="kpi-value gold" id="kCapTotal">$—</div>
+      <div class="kpi-sub">USDT del agente</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Capital Desplegado</div>
+      <div class="kpi-value" id="kCapDep">$—</div>
+      <div class="kpi-sub">en posiciones abiertas</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Capital Libre</div>
+      <div class="kpi-value green" id="kCapLibre">$—</div>
+      <div class="kpi-sub">disponible para operar</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Posiciones Abiertas</div>
+      <div class="kpi-value" id="kPositions">—</div>
+      <div class="kpi-sub" id="kMaxPos">máx. — simultáneas</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Ciclos Hoy</div>
+      <div class="kpi-value" id="kCycles">—</div>
+      <div class="kpi-sub">cada 5 minutos</div>
+    </div>
+  </div>
+
+  <!-- POSICIONES ABIERTAS -->
+  <div class="card">
+    <div class="card-title">Posiciones Abiertas</div>
+    <div id="posContainer">
+      <div class="empty-state">Sin posiciones abiertas en este momento</div>
+    </div>
+  </div>
+
+  <!-- MERCADO: Fear & Greed + BTC Dominance -->
+  <div class="market-grid">
+
+    <div class="card">
+      <div class="card-title">Fear & Greed Index</div>
+      <div class="fg-wrap">
+        <svg class="fg-svg" viewBox="0 0 200 115">
+          <!-- Arco de fondo -->
+          <path d="M 20,105 A 80,80 0 0,1 180,105" fill="none" stroke="#21262d" stroke-width="14" stroke-linecap="round"/>
+          <!-- Arco del valor -->
+          <path id="fgArcVal" d="M 20,105 A 80,80 0 0,1 180,105" fill="none" stroke="#f0b90b" stroke-width="14" stroke-linecap="round" stroke-dasharray="0 300"/>
+          <!-- Número centrado -->
+          <text id="fgNum" x="100" y="90" text-anchor="middle" font-size="52" font-weight="900" fill="#f0b90b" font-family="system-ui,sans-serif">—</text>
+          <text id="fgLbl" x="100" y="112" text-anchor="middle" font-size="13" fill="#8b949e" font-family="system-ui,sans-serif">Cargando...</text>
+        </svg>
+        <div class="fg-scale">
+          <span>😱 Miedo extremo</span>
+          <span>🤑 Codicia extrema</span>
+        </div>
+      </div>
+      <div class="agent-quote" id="fgQuote" style="margin-top:16px">Obteniendo datos...</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Dominancia BTC</div>
+      <div class="big-pct" id="btcDom">—%</div>
+      <div class="dom-bar">
+        <div class="dom-fill" id="btcDomFill" style="width:0%"></div>
+      </div>
+      <div class="dom-legend">
+        <span>ETH: <strong id="ethDom">—%</strong></span>
+        <span>Stables: <strong id="stableDomSmall">—%</strong></span>
+        <span>Otros: <strong id="otherDom">—%</strong></span>
+      </div>
+      <div class="agent-quote" id="btcQuote">Obteniendo datos...</div>
+    </div>
+
+  </div>
+
+  <!-- STABLECOINS vs MERCADO TOTAL -->
+  <div class="card">
+    <div class="card-title">Stablecoins vs Mercado Cripto Total</div>
+    <div class="stables-grid">
+
+      <div>
+        <div style="margin-bottom:20px">
+          <div class="metric-name">Market Cap Total — todo el cripto</div>
+          <div class="metric-val" id="totalMC">—</div>
+          <div class="mc-bar">
+            <div class="mc-fill" style="width:100%; background:linear-gradient(90deg,var(--blue),var(--green))"></div>
+          </div>
+          <div style="font-size:11px; color:var(--muted)">
+            Cambio 24h: <strong id="mcChange" style="color:var(--text)">—</strong>
+          </div>
+        </div>
+
+        <div>
+          <div class="metric-name">Stablecoins — dinero en reserva</div>
+          <div class="metric-val" id="stableMC" style="color:var(--gold)">—</div>
+          <div class="mc-bar">
+            <div class="mc-fill" id="stableBar" style="width:0%; background:var(--gold)"></div>
+          </div>
+          <div style="font-size:11px; color:var(--muted)">
+            <span id="stablePct">—%</span> del mercado total
+          </div>
+        </div>
+
+        <div class="div-badge" id="divBadge" style="color:var(--gold); border-color:var(--gold); background:rgba(240,185,11,.1)">
+          ⏳ Calculando señal...
+        </div>
+      </div>
+
+      <div>
+        <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:10px">
+          📊 El agente explica
+        </div>
+        <div class="agent-quote" id="stableQuote" style="margin-top:0">Obteniendo datos...</div>
+
+        <div class="legend-box">
+          <div style="font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px">Cómo leer esta métrica</div>
+          🟡 <strong style="color:var(--text)">Stables ↑ + mercado ↑:</strong> capital nuevo entrando (alcista)<br>
+          🔴 <strong style="color:var(--text)">Stables ↑ + mercado ↓:</strong> la gente se refugia (bajista)<br>
+          🟢 <strong style="color:var(--text)">Stables ↓ + mercado ↑:</strong> rotación activa a cripto (muy alcista)<br>
+          ⚪ <strong style="color:var(--text)">Stables ↓ + mercado ↓:</strong> salida general del ecosistema
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- DECISIONES + LOG -->
+  <div class="two-col">
+
+    <div class="card">
+      <div class="card-title">Últimas Decisiones del Agente</div>
+      <div id="decList">
+        <div class="empty-state">Sin decisiones registradas</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Log en Vivo</div>
+      <div class="log-box" id="logBox">Cargando log...</div>
+    </div>
+
+  </div>
+
+  <!-- NARRATIVAS (CMC Pro) -->
+  <div class="card">
+    <div class="card-title">Narrativas del Mercado — últimos 15 días</div>
+    <div class="narratives-wrapper">
+      <div class="narratives-grid">
+        <div class="nar-card">
+          <div class="nar-title" style="color:var(--gold)">🤖 Agentes IA</div>
+          <div class="nar-desc">Tokens vinculados a agentes autónomos de inteligencia artificial y automatización on-chain.</div>
+          <div class="nar-stats">
+            <span class="tag">📰 12 noticias</span>
+            <span class="tag">👥 47 KOLs</span>
+            <span class="tag green">↑ Tendencia</span>
+          </div>
+        </div>
+        <div class="nar-card">
+          <div class="nar-title" style="color:var(--blue)">📡 DePIN</div>
+          <div class="nar-desc">Infraestructura física descentralizada: redes de sensores, computación y conectividad con incentivos tokenizados.</div>
+          <div class="nar-stats">
+            <span class="tag">📰 8 noticias</span>
+            <span class="tag">👥 23 KOLs</span>
+            <span class="tag">→ Neutral</span>
+          </div>
+        </div>
+        <div class="nar-card">
+          <div class="nar-title" style="color:var(--green)">💎 DeFi</div>
+          <div class="nar-desc">Finanzas descentralizadas: protocolos de lending, DEX y yield en auge esta semana en BSC.</div>
+          <div class="nar-stats">
+            <span class="tag">📰 19 noticias</span>
+            <span class="tag">👥 61 KOLs</span>
+            <span class="tag green">↑ Tendencia</span>
+          </div>
+        </div>
+      </div>
+      <div class="pro-overlay">
+        <div style="font-size:28px; margin-bottom:10px">🔒</div>
+        <div style="font-weight:800; color:var(--gold); font-size:16px; margin-bottom:6px">Narrativas reales con CMC Pro</div>
+        <div style="color:var(--muted); font-size:13px; line-height:1.6">
+          Noticias reales, conteo de KOLs y sentimiento por narrativa<br>
+          vía CoinMarketCap AI Agent Hub · <strong style="color:var(--text)">Disponible el lunes</strong>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// ── Fear & Greed helpers ───────────────────────
+function fgColor(v) {
+  if (v <= 24) return '#f85149';
+  if (v <= 44) return '#ff9800';
+  if (v <= 55) return '#f0b90b';
+  if (v <= 74) return '#4caf50';
+  return '#3fb950';
+}
+
+function fgLabel(v) {
+  if (v <= 24) return 'Miedo Extremo';
+  if (v <= 44) return 'Miedo';
+  if (v <= 55) return 'Neutral';
+  if (v <= 74) return 'Codicia';
+  return 'Codicia Extrema';
+}
+
+function fgQuote(v) {
+  if (v <= 24) return `Pánico extremo en el mercado (${v}/100). Históricamente estos niveles son oportunidades de compra, pero el riesgo de caída adicional es real. El agente espera confirmación de volumen.`;
+  if (v <= 44) return `Hay miedo en el mercado (${v}/100). Los inversores están cautelosos. El agente aplica criterios más estrictos: solo entra con volumen muy alto y sentimiento positivo claro.`;
+  if (v <= 55) return `Mercado neutral (${v}/100). Sin euforia ni pánico. Condiciones ideales para operar con fundamentos: el volumen y el sentimiento del token pesan más que el estado general.`;
+  if (v <= 74) return `Codicia en el mercado (${v}/100). Los inversores compran con optimismo. El agente está activo pero verifica que el volumen del token confirme la tendencia antes de entrar.`;
+  return `Codicia extrema (${v}/100). Cuidado: en estos niveles históricos suelen venir correcciones. El agente ajusta el stop loss más cerca de la entrada para proteger el capital.`;
+}
+
+function drawFG(value) {
+  const color = fgColor(value);
+  const semiCircum = Math.PI * 80; // ~251.3
+  const dash = (value / 100) * semiCircum;
+
+  document.getElementById('fgArcVal').setAttribute('stroke', color);
+  document.getElementById('fgArcVal').setAttribute('stroke-dasharray', `${dash} ${semiCircum}`);
+  document.getElementById('fgNum').setAttribute('fill', color);
+  document.getElementById('fgNum').textContent   = value;
+  document.getElementById('fgLbl').textContent   = fgLabel(value);
+  document.getElementById('fgQuote').textContent = fgQuote(value);
+}
+
+// ── Escape HTML ────────────────────────────────
+function esc(t) {
+  return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Render state ───────────────────────────────
+function renderState(d) {
+  document.getElementById('lastCycle').textContent  = d.last_cycle || '—';
+  document.getElementById('kCapTotal').textContent  = `$${d.capital_total}`;
+  document.getElementById('kCapDep').textContent    = `$${d.capital_desplegado}`;
+  document.getElementById('kCapLibre').textContent  = `$${d.capital_libre}`;
+  document.getElementById('kPositions').textContent = d.total_positions;
+  document.getElementById('kMaxPos').textContent    = `máx. ${d.max_positions} simultáneas`;
+  document.getElementById('kCycles').textContent    = d.cycles_today;
+
+  // Positions
+  const posEl = document.getElementById('posContainer');
+  if (d.open_positions && d.open_positions.length > 0) {
+    posEl.innerHTML = d.open_positions.map(p => `
+      <div class="position-card">
+        <div class="pos-header">
+          <div class="pos-symbol">${esc(p.symbol)}</div>
+          <div class="tags">
+            <span class="tag gold">$${p.capital} USDT</span>
+            <span class="tag green">${esc(p.sentiment || 'POSITIVO')}</span>
+            <span class="tag">${esc(p.narrative || '—')}</span>
+            <span class="tag">⏱ ${p.hours_open ?? '—'}h abierta</span>
+            <span class="tag">Hold máx: ${p.hold_max_hours}h</span>
+          </div>
+        </div>
+        ${p.reasoning ? `<div class="reasoning-box">${esc(p.reasoning)}</div>` : ''}
+      </div>
+    `).join('');
+  } else {
+    posEl.innerHTML = '<div class="empty-state">Sin posiciones abiertas en este momento</div>';
+  }
+
+  // Decisions
+  const decEl = document.getElementById('decList');
+  if (d.recent_decisions && d.recent_decisions.length > 0) {
+    decEl.innerHTML = d.recent_decisions.map(dec => `
+      <div class="dec-item ${dec.action}">
+        <span class="dec-time">${esc(dec.time)}</span>
+        <span>${esc(dec.msg)}</span>
+      </div>
+    `).join('');
+  } else {
+    decEl.innerHTML = '<div class="empty-state">Sin decisiones registradas</div>';
+  }
+
+  // Log
+  const logEl = document.getElementById('logBox');
+  if (d.recent_log && d.recent_log.length > 0) {
+    logEl.innerHTML = d.recent_log.map(line => {
+      let cls = 'll';
+      if (line.includes('[AGENTE]'))    cls += ' ag';
+      else if (line.includes('[DECISION]')) cls += ' dec';
+      else if (line.includes('[EXECUTOR]') || line.includes('[WATCHER]')) cls += ' exec';
+      else if (/error|excepci/i.test(line)) cls += ' err';
+      return `<span class="${cls}">${esc(line)}</span>`;
+    }).join('\n');
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+}
+
+// ── Render market ──────────────────────────────
+function renderMarket(d) {
+  if (d.fear_greed) {
+    drawFG(d.fear_greed.value);
+  }
+
+  if (d.global) {
+    const g = d.global;
+
+    // BTC dominance
+    document.getElementById('btcDom').textContent     = `${g.btc_dominance}%`;
+    document.getElementById('btcDomFill').style.width = `${g.btc_dominance}%`;
+    document.getElementById('ethDom').textContent     = `${g.eth_dominance}%`;
+    document.getElementById('stableDomSmall').textContent = `${g.stablecoin_dominance}%`;
+    const other = Math.max(0, 100 - g.btc_dominance - g.eth_dominance - g.stablecoin_dominance).toFixed(1);
+    document.getElementById('otherDom').textContent   = `${other}%`;
+
+    // Stables vs market
+    const chg = g.market_cap_change_24h;
+    document.getElementById('totalMC').textContent  = g.total_market_cap_formatted;
+    document.getElementById('mcChange').innerHTML   =
+      `<span style="color:${chg >= 0 ? 'var(--green)' : 'var(--red)'}">${chg >= 0 ? '+' : ''}${chg}%</span>`;
+    document.getElementById('stableMC').textContent = g.stablecoin_market_cap_formatted;
+    document.getElementById('stablePct').textContent = `${g.stablecoin_dominance}%`;
+    // bar width: scale 0-20% of market → 0-100% bar width
+    document.getElementById('stableBar').style.width = `${Math.min(g.stablecoin_dominance * 5, 100)}%`;
+  }
+
+  if (d.agent_interpretation) {
+    const interp = d.agent_interpretation;
+    document.getElementById('btcQuote').textContent   = interp.btc_dominance || '';
+    document.getElementById('stableQuote').textContent = interp.stablecoin || '';
+
+    const divMap = {
+      ROTACION: { icon: '🟢', text: 'ROTACIÓN — Dinero entrando al cripto',  color: 'var(--green)', bg: 'rgba(63,185,80,.1)' },
+      REFUGIO:  { icon: '🔴', text: 'REFUGIO — Inversores en stablecoins',  color: 'var(--red)',   bg: 'rgba(248,81,73,.1)' },
+      NEUTRAL:  { icon: '🟡', text: 'NEUTRAL — Sin señal clara',             color: 'var(--gold)',  bg: 'rgba(240,185,11,.1)' },
+    };
+    const badge = document.getElementById('divBadge');
+    const m = divMap[interp.divergence] || divMap.NEUTRAL;
+    badge.textContent        = `${m.icon} ${m.text}`;
+    badge.style.color        = m.color;
+    badge.style.borderColor  = m.color;
+    badge.style.background   = m.bg;
+  }
+}
+
+// ── Fetch & refresh ────────────────────────────
+async function fetchAll() {
+  try {
+    const token = window.__DT__ || '';
+    const headers = token ? { 'X-Dashboard-Token': token } : {};
+    const [sRes, mRes] = await Promise.all([
+      fetch('/api/state',  { headers }),
+      fetch('/api/market', { headers })
+    ]);
+    renderState(await sRes.json());
+    renderMarket(await mRes.json());
+  } catch (e) {
+    console.error('Error:', e);
+  }
+}
+
+let countdown = 30;
+setInterval(() => {
+  countdown--;
+  document.getElementById('countdown').textContent = countdown;
+  if (countdown <= 0) { countdown = 30; fetchAll(); }
+}, 1000);
+
+fetchAll();
+</script>
+</body>
+</html>

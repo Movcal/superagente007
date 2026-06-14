@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 import sys, pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 from modules.sentiment_analyzer import analyze as analyze_sentiment
+from modules.news_analyzer import get_market_bias
 
 load_dotenv()
 
@@ -170,11 +171,27 @@ def evaluate(volume_alert, path="B"):
         log(f"{symbol} rechazado: sentimiento {sentiment['sentiment']}, se necesita POSITIVO")
         return None
 
+    # Analisis de noticias y KOLs via Claude
+    # Si CLAUDE_ENABLED=false -> market_bias=None y este bloque no hace nada
+    market_bias = get_market_bias(symbol)
+    if market_bias:
+        if market_bias["action_modifier"] == "SKIP":
+            log(f"{symbol} rechazado por Claude: {market_bias['reason']}")
+            return None
+        if market_bias["action_modifier"] == "REDUCE_SIZE":
+            log(f"{symbol} capital reducido por Claude: {market_bias['reason']}")
+            # Se aplica el 50% de reduccion despues de calculate_position_size
+
     # Calcular capital
     capital = calculate_position_size(volume_ratio, sentiment["score"], sentiment["is_priority"])
     if capital <= 0:
         log(f"{symbol} rechazado: sin capital disponible")
         return None
+
+    # Aplicar reduccion de Claude si corresponde
+    if market_bias and market_bias["action_modifier"] == "REDUCE_SIZE":
+        capital = round(capital * 0.5, 2)
+        log(f"{symbol} capital ajustado a ${capital} (50% por señal de cautela de Claude)")
 
     # Estimar tiempo de hold
     hold_min, hold_max, hold_reason = estimate_hold_time(

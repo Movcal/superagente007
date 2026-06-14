@@ -414,12 +414,13 @@ body {
     <div class="logo">SUPER<span>AGENTE</span>007</div>
     <div class="status-badge">
       <div class="dot"></div>
-      <span id="statusText">ACTIVO</span>
+      <span id="statusText" data-i18n="status_active">ACTIVO</span>
     </div>
   </div>
   <div class="header-right">
-    <span>Último ciclo: <strong id="lastCycle" style="color:var(--text)">—</strong></span>
+    <span data-i18n="last_cycle_label">Último ciclo:</span> <strong id="lastCycle" style="color:var(--text)">—</strong>
     <div class="refresh-chip">⟳ <span id="countdown">30</span>s</div>
+    <button id="langToggle" onclick="toggleLang()" style="background:var(--card2); border:1px solid var(--border); color:var(--text); border-radius:8px; padding:4px 12px; font-size:12px; font-weight:700; cursor:pointer; letter-spacing:1px;">EN</button>
   </div>
 </header>
 
@@ -428,37 +429,37 @@ body {
   <!-- KPIs -->
   <div class="kpi-grid">
     <div class="kpi-card">
-      <div class="kpi-label">Capital Total</div>
+      <div class="kpi-label" data-i18n="kpi_total">Capital Total</div>
       <div class="kpi-value gold" id="kCapTotal">$—</div>
-      <div class="kpi-sub">USDT del agente</div>
+      <div class="kpi-sub" data-i18n="kpi_total_sub">USDT del agente</div>
     </div>
     <div class="kpi-card">
-      <div class="kpi-label">Capital Desplegado</div>
+      <div class="kpi-label" data-i18n="kpi_dep">Capital Desplegado</div>
       <div class="kpi-value" id="kCapDep">$—</div>
-      <div class="kpi-sub">en posiciones abiertas</div>
+      <div class="kpi-sub" data-i18n="kpi_dep_sub">en posiciones abiertas</div>
     </div>
     <div class="kpi-card">
-      <div class="kpi-label">Capital Libre</div>
+      <div class="kpi-label" data-i18n="kpi_libre">Capital Libre</div>
       <div class="kpi-value green" id="kCapLibre">$—</div>
-      <div class="kpi-sub">disponible para operar</div>
+      <div class="kpi-sub" data-i18n="kpi_libre_sub">disponible para operar</div>
     </div>
     <div class="kpi-card">
-      <div class="kpi-label">Posiciones Abiertas</div>
+      <div class="kpi-label" data-i18n="kpi_pos">Posiciones Abiertas</div>
       <div class="kpi-value" id="kPositions">—</div>
       <div class="kpi-sub" id="kMaxPos">máx. — simultáneas</div>
     </div>
     <div class="kpi-card">
-      <div class="kpi-label">Ciclos Hoy</div>
+      <div class="kpi-label" data-i18n="kpi_cycles">Ciclos Hoy</div>
       <div class="kpi-value" id="kCycles">—</div>
-      <div class="kpi-sub">cada 5 minutos</div>
+      <div class="kpi-sub" data-i18n="kpi_cycles_sub">cada 5 minutos</div>
     </div>
   </div>
 
   <!-- POSICIONES ABIERTAS -->
   <div class="card">
-    <div class="card-title">Posiciones Abiertas</div>
+    <div class="card-title" data-i18n="title_positions">Posiciones Abiertas</div>
     <div id="posContainer">
-      <div class="empty-state">Sin posiciones abiertas en este momento</div>
+      <div class="empty-state" data-i18n="no_positions">Sin posiciones abiertas en este momento</div>
     </div>
   </div>
 
@@ -478,15 +479,15 @@ body {
           <text id="fgLbl" x="100" y="112" text-anchor="middle" font-size="13" fill="#8b949e" font-family="system-ui,sans-serif">Cargando...</text>
         </svg>
         <div class="fg-scale">
-          <span>😱 Miedo extremo</span>
-          <span>🤑 Codicia extrema</span>
+          <span data-i18n="fg_fear">😱 Miedo extremo</span>
+          <span data-i18n="fg_greed">🤑 Codicia extrema</span>
         </div>
       </div>
-      <div class="agent-quote" id="fgQuote" style="margin-top:16px">Obteniendo datos...</div>
+      <div class="agent-quote" id="fgQuote" style="margin-top:16px" data-i18n="loading">Obteniendo datos...</div>
     </div>
 
     <div class="card">
-      <div class="card-title">Dominancia BTC</div>
+      <div class="card-title" data-i18n="title_btc">Dominancia BTC</div>
       <div class="big-pct" id="btcDom">—%</div>
       <div class="dom-bar">
         <div class="dom-fill" id="btcDomFill" style="width:0%"></div>
@@ -494,58 +495,58 @@ body {
       <div class="dom-legend">
         <span>ETH: <strong id="ethDom">—%</strong></span>
         <span>Stables: <strong id="stableDomSmall">—%</strong></span>
-        <span>Otros: <strong id="otherDom">—%</strong></span>
+        <span><span data-i18n="others">Otros</span>: <strong id="otherDom">—%</strong></span>
       </div>
-      <div class="agent-quote" id="btcQuote">Obteniendo datos...</div>
+      <div class="agent-quote" id="btcQuote" data-i18n="loading">Obteniendo datos...</div>
     </div>
 
   </div>
 
   <!-- STABLECOINS vs MERCADO TOTAL -->
   <div class="card">
-    <div class="card-title">Stablecoins vs Mercado Cripto Total</div>
+    <div class="card-title" data-i18n="title_stables">Stablecoins vs Mercado Cripto Total</div>
     <div class="stables-grid">
 
       <div>
         <div style="margin-bottom:20px">
-          <div class="metric-name">Market Cap Total — todo el cripto</div>
+          <div class="metric-name" data-i18n="mc_name">Market Cap Total — todo el cripto</div>
           <div class="metric-val" id="totalMC">—</div>
           <div class="mc-bar">
             <div class="mc-fill" style="width:100%; background:linear-gradient(90deg,var(--blue),var(--green))"></div>
           </div>
           <div style="font-size:11px; color:var(--muted)">
-            Cambio 24h: <strong id="mcChange" style="color:var(--text)">—</strong>
+            <span data-i18n="mc_change">Cambio 24h:</span> <strong id="mcChange" style="color:var(--text)">—</strong>
           </div>
         </div>
 
         <div>
-          <div class="metric-name">Stablecoins — dinero en reserva</div>
+          <div class="metric-name" data-i18n="stable_name">Stablecoins — dinero en reserva</div>
           <div class="metric-val" id="stableMC" style="color:var(--gold)">—</div>
           <div class="mc-bar">
             <div class="mc-fill" id="stableBar" style="width:0%; background:var(--gold)"></div>
           </div>
           <div style="font-size:11px; color:var(--muted)">
-            <span id="stablePct">—%</span> del mercado total
+            <span id="stablePct">—%</span> <span data-i18n="of_total">del mercado total</span>
           </div>
         </div>
 
         <div class="div-badge" id="divBadge" style="color:var(--gold); border-color:var(--gold); background:rgba(240,185,11,.1)">
-          ⏳ Calculando señal...
+          ⏳ <span data-i18n="calculating">Calculando señal...</span>
         </div>
       </div>
 
       <div>
-        <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:10px">
+        <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:10px" data-i18n="agent_explains">
           📊 El agente explica
         </div>
-        <div class="agent-quote" id="stableQuote" style="margin-top:0">Obteniendo datos...</div>
+        <div class="agent-quote" id="stableQuote" style="margin-top:0" data-i18n="loading">Obteniendo datos...</div>
 
         <div class="legend-box">
-          <div style="font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px">Cómo leer esta métrica</div>
-          🟡 <strong style="color:var(--text)">Stables ↑ + mercado ↑:</strong> capital nuevo entrando (alcista)<br>
-          🔴 <strong style="color:var(--text)">Stables ↑ + mercado ↓:</strong> la gente se refugia (bajista)<br>
-          🟢 <strong style="color:var(--text)">Stables ↓ + mercado ↑:</strong> rotación activa a cripto (muy alcista)<br>
-          ⚪ <strong style="color:var(--text)">Stables ↓ + mercado ↓:</strong> salida general del ecosistema
+          <div style="font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px" data-i18n="how_to_read">Cómo leer esta métrica</div>
+          🟡 <strong style="color:var(--text)" data-i18n="leg1_k">Stables ↑ + mercado ↑:</strong> <span data-i18n="leg1_v">capital nuevo entrando (alcista)</span><br>
+          🔴 <strong style="color:var(--text)" data-i18n="leg2_k">Stables ↑ + mercado ↓:</strong> <span data-i18n="leg2_v">la gente se refugia (bajista)</span><br>
+          🟢 <strong style="color:var(--text)" data-i18n="leg3_k">Stables ↓ + mercado ↑:</strong> <span data-i18n="leg3_v">rotación activa a cripto (muy alcista)</span><br>
+          ⚪ <strong style="color:var(--text)" data-i18n="leg4_k">Stables ↓ + mercado ↓:</strong> <span data-i18n="leg4_v">salida general del ecosistema</span>
         </div>
       </div>
 
@@ -556,61 +557,114 @@ body {
   <div class="two-col">
 
     <div class="card">
-      <div class="card-title">Últimas Decisiones del Agente</div>
+      <div class="card-title" data-i18n="title_decisions">Últimas Decisiones del Agente</div>
       <div id="decList">
-        <div class="empty-state">Sin decisiones registradas</div>
+        <div class="empty-state" data-i18n="no_decisions">Sin decisiones registradas</div>
       </div>
     </div>
 
     <div class="card">
-      <div class="card-title">Log en Vivo</div>
-      <div class="log-box" id="logBox">Cargando log...</div>
+      <div class="card-title" data-i18n="title_log">Log en Vivo</div>
+      <div class="log-box" id="logBox" data-i18n="log_loading">Cargando log...</div>
     </div>
 
   </div>
 
   <!-- NARRATIVAS (CMC Pro) -->
   <div class="card">
-    <div class="card-title">Narrativas del Mercado — últimos 15 días</div>
+    <div class="card-title" data-i18n="title_narratives">Narrativas del Mercado — últimos 15 días</div>
     <div class="narratives-wrapper">
       <div class="narratives-grid">
         <div class="nar-card">
-          <div class="nar-title" style="color:var(--gold)">🤖 Agentes IA</div>
-          <div class="nar-desc">Tokens vinculados a agentes autónomos de inteligencia artificial y automatización on-chain.</div>
+          <div class="nar-title" style="color:var(--gold)" data-i18n="nar1_title">🤖 Agentes IA</div>
+          <div class="nar-desc" data-i18n="nar1_desc">Tokens vinculados a agentes autónomos de inteligencia artificial y automatización on-chain.</div>
           <div class="nar-stats">
-            <span class="tag">📰 12 noticias</span>
+            <span class="tag">📰 12 <span data-i18n="news">noticias</span></span>
             <span class="tag">👥 47 KOLs</span>
-            <span class="tag green">↑ Tendencia</span>
+            <span class="tag green" data-i18n="trending">↑ Tendencia</span>
           </div>
         </div>
         <div class="nar-card">
           <div class="nar-title" style="color:var(--blue)">📡 DePIN</div>
-          <div class="nar-desc">Infraestructura física descentralizada: redes de sensores, computación y conectividad con incentivos tokenizados.</div>
+          <div class="nar-desc" data-i18n="nar2_desc">Infraestructura física descentralizada: redes de sensores, computación y conectividad con incentivos tokenizados.</div>
           <div class="nar-stats">
-            <span class="tag">📰 8 noticias</span>
+            <span class="tag">📰 8 <span data-i18n="news">noticias</span></span>
             <span class="tag">👥 23 KOLs</span>
             <span class="tag">→ Neutral</span>
           </div>
         </div>
         <div class="nar-card">
           <div class="nar-title" style="color:var(--green)">💎 DeFi</div>
-          <div class="nar-desc">Finanzas descentralizadas: protocolos de lending, DEX y yield en auge esta semana en BSC.</div>
+          <div class="nar-desc" data-i18n="nar3_desc">Finanzas descentralizadas: protocolos de lending, DEX y yield en auge esta semana en BSC.</div>
           <div class="nar-stats">
-            <span class="tag">📰 19 noticias</span>
+            <span class="tag">📰 19 <span data-i18n="news">noticias</span></span>
             <span class="tag">👥 61 KOLs</span>
-            <span class="tag green">↑ Tendencia</span>
+            <span class="tag green" data-i18n="trending">↑ Tendencia</span>
           </div>
         </div>
       </div>
       <div class="pro-overlay">
         <div style="font-size:28px; margin-bottom:10px">🔒</div>
-        <div style="font-weight:800; color:var(--gold); font-size:16px; margin-bottom:6px">Narrativas reales con CMC Pro</div>
-        <div style="color:var(--muted); font-size:13px; line-height:1.6">
+        <div style="font-weight:800; color:var(--gold); font-size:16px; margin-bottom:6px" data-i18n="pro_title">Narrativas reales con CMC Pro</div>
+        <div style="color:var(--muted); font-size:13px; line-height:1.6" data-i18n="pro_desc">
           Noticias reales, conteo de KOLs y sentimiento por narrativa<br>
           vía CoinMarketCap AI Agent Hub · <strong style="color:var(--text)">Disponible el lunes</strong>
         </div>
       </div>
     </div>
+  </div>
+
+
+  <!-- SECCION COMERCIAL -->
+  <div style="background: linear-gradient(135deg, #161b22 0%, #1c2128 100%); border: 1px solid rgba(240,185,11,0.3); border-radius: 16px; padding: 36px 40px; display: flex; align-items: center; justify-content: space-between; gap: 32px; flex-wrap: wrap;">
+
+    <div style="flex: 1; min-width: 280px;">
+      <div style="font-size: 11px; color: var(--gold); text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700; margin-bottom: 12px;" data-i18n="coming_soon">
+        🚀 Próximamente
+      </div>
+      <div style="font-size: 26px; font-weight: 800; line-height: 1.3; margin-bottom: 14px;" data-i18n="pitch_title">
+        ¿Querés que este agente opere<br>en tu exchange favorito?
+      </div>
+      <div style="font-size: 14px; color: var(--muted); line-height: 1.8; margin-bottom: 20px;" data-i18n="pitch_desc">
+        Conectá tu API key con permisos <strong style="color:var(--text)">solo de trading</strong> — el agente nunca puede retirar tus fondos.<br>
+        Vos mantenés el control total de tu cuenta en todo momento.
+      </div>
+      <div style="display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--muted);">
+        <span data-i18n="feat1">✅ Self-custody total</span>
+        <span data-i18n="feat2">✅ Sin acceso a retiros</span>
+        <span data-i18n="feat3">✅ Podés desconectar cuando quieras</span>
+      </div>
+    </div>
+
+    <div style="flex-shrink: 0; text-align: center; min-width: 260px;">
+      <div style="font-size: 13px; color: var(--muted); margin-bottom: 12px;" data-i18n="email_label">
+        Dejá tu email y te avisamos cuando esté disponible
+      </div>
+      <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
+        <input
+          type="email"
+          id="waitlistEmail"
+          placeholder="tu@email.com"
+          style="background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--text); font-size: 13px; width: 200px; outline: none;"
+          onfocus="this.style.borderColor='var(--gold)'"
+          onblur="this.style.borderColor='var(--border)'"
+        />
+        <button
+          onclick="joinWaitlist()"
+          style="background: var(--gold); color: #000; border: none; border-radius: 8px; padding: 10px 18px; font-size: 13px; font-weight: 700; cursor: pointer;"
+          onmouseover="this.style.opacity='0.85'"
+          onmouseout="this.style.opacity='1'"
+          data-i18n="btn_access"
+        >
+          Quiero acceso
+        </button>
+      </div>
+      <div id="waitlistMsg" style="font-size: 12px; color: var(--green); margin-top: 10px; min-height: 18px;"></div>
+      <div style="margin-top: 16px; font-size: 11px; color: var(--muted);" data-i18n="pitch_footer">
+        Ya vieron los resultados del agente 👆 — vos podés ser el siguiente.
+      </div>
+    </div>
+
   </div>
 
 </main>
@@ -626,6 +680,13 @@ function fgColor(v) {
 }
 
 function fgLabel(v) {
+  if (currentLang === 'en') {
+    if (v <= 24) return 'Extreme Fear';
+    if (v <= 44) return 'Fear';
+    if (v <= 55) return 'Neutral';
+    if (v <= 74) return 'Greed';
+    return 'Extreme Greed';
+  }
   if (v <= 24) return 'Miedo Extremo';
   if (v <= 44) return 'Miedo';
   if (v <= 55) return 'Neutral';
@@ -634,6 +695,13 @@ function fgLabel(v) {
 }
 
 function fgQuote(v) {
+  if (currentLang === 'en') {
+    if (v <= 24) return `Extreme panic in the market (${v}/100). Historically these levels are buying opportunities, but the risk of further decline is real. The agent waits for volume confirmation.`;
+    if (v <= 44) return `There is fear in the market (${v}/100). Investors are cautious. The agent applies stricter criteria: only enters with very high volume and clear positive sentiment.`;
+    if (v <= 55) return `Neutral market (${v}/100). No euphoria or panic. Ideal conditions to trade on fundamentals: token volume and sentiment matter more than the general state.`;
+    if (v <= 74) return `Greed in the market (${v}/100). Investors are buying with optimism. The agent is active but verifies that token volume confirms the trend before entering.`;
+    return `Extreme greed (${v}/100). Caution: at these historical levels corrections usually follow. The agent tightens the stop loss closer to entry to protect capital.`;
+  }
   if (v <= 24) return `Pánico extremo en el mercado (${v}/100). Históricamente estos niveles son oportunidades de compra, pero el riesgo de caída adicional es real. El agente espera confirmación de volumen.`;
   if (v <= 44) return `Hay miedo en el mercado (${v}/100). Los inversores están cautelosos. El agente aplica criterios más estrictos: solo entra con volumen muy alto y sentimiento positivo claro.`;
   if (v <= 55) return `Mercado neutral (${v}/100). Sin euforia ni pánico. Condiciones ideales para operar con fundamentos: el volumen y el sentimiento del token pesan más que el estado general.`;
@@ -670,6 +738,9 @@ function renderState(d) {
   document.getElementById('kCycles').textContent    = d.cycles_today;
 
   // Positions
+  const maxTxt = currentLang === 'en' ? `max. ${d.max_positions} simultaneous` : `máx. ${d.max_positions} simultáneas`;
+  document.getElementById('kMaxPos').textContent = maxTxt;
+
   const posEl = document.getElementById('posContainer');
   if (d.open_positions && d.open_positions.length > 0) {
     posEl.innerHTML = d.open_positions.map(p => `
@@ -688,7 +759,7 @@ function renderState(d) {
       </div>
     `).join('');
   } else {
-    posEl.innerHTML = '<div class="empty-state">Sin posiciones abiertas en este momento</div>';
+    posEl.innerHTML = `<div class="empty-state">${t('no_positions')}</div>`;
   }
 
   // Decisions
@@ -701,7 +772,7 @@ function renderState(d) {
       </div>
     `).join('');
   } else {
-    decEl.innerHTML = '<div class="empty-state">Sin decisiones registradas</div>';
+    decEl.innerHTML = `<div class="empty-state">${t('no_decisions')}</div>`;
   }
 
   // Log
@@ -753,13 +824,13 @@ function renderMarket(d) {
     document.getElementById('stableQuote').textContent = interp.stablecoin || '';
 
     const divMap = {
-      ROTACION: { icon: '🟢', text: 'ROTACIÓN — Dinero entrando al cripto',  color: 'var(--green)', bg: 'rgba(63,185,80,.1)' },
-      REFUGIO:  { icon: '🔴', text: 'REFUGIO — Inversores en stablecoins',  color: 'var(--red)',   bg: 'rgba(248,81,73,.1)' },
-      NEUTRAL:  { icon: '🟡', text: 'NEUTRAL — Sin señal clara',             color: 'var(--gold)',  bg: 'rgba(240,185,11,.1)' },
+      ROTACION: { key: 'div_rotation', color: 'var(--green)', bg: 'rgba(63,185,80,.1)' },
+      REFUGIO:  { key: 'div_refuge',   color: 'var(--red)',   bg: 'rgba(248,81,73,.1)' },
+      NEUTRAL:  { key: 'div_neutral',  color: 'var(--gold)',  bg: 'rgba(240,185,11,.1)' },
     };
     const badge = document.getElementById('divBadge');
     const m = divMap[interp.divergence] || divMap.NEUTRAL;
-    badge.textContent        = `${m.icon} ${m.text}`;
+    badge.textContent        = t(m.key);
     badge.style.color        = m.color;
     badge.style.borderColor  = m.color;
     badge.style.background   = m.bg;
@@ -775,14 +846,143 @@ async function fetchAll() {
       fetch('/api/state',  { headers }),
       fetch('/api/market', { headers })
     ]);
-    renderState(await sRes.json());
-    renderMarket(await mRes.json());
+    lastStateData  = await sRes.json();
+    lastMarketData = await mRes.json();
+    renderState(lastStateData);
+    renderMarket(lastMarketData);
   } catch (e) {
     console.error('Error:', e);
   }
 }
 
+// ── TRADUCCIONES ───────────────────────────────────────
+const LANGS = {
+  es: {
+    status_active: 'ACTIVO',
+    last_cycle_label: 'Último ciclo:',
+    kpi_total: 'Capital Total', kpi_total_sub: 'USDT del agente',
+    kpi_dep: 'Capital Desplegado', kpi_dep_sub: 'en posiciones abiertas',
+    kpi_libre: 'Capital Libre', kpi_libre_sub: 'disponible para operar',
+    kpi_pos: 'Posiciones Abiertas', kpi_cycles: 'Ciclos Hoy', kpi_cycles_sub: 'cada 5 minutos',
+    title_positions: 'Posiciones Abiertas',
+    no_positions: 'Sin posiciones abiertas en este momento',
+    fg_fear: '😱 Miedo extremo', fg_greed: '🤑 Codicia extrema',
+    loading: 'Obteniendo datos...',
+    title_btc: 'Dominancia BTC', others: 'Otros',
+    title_stables: 'Stablecoins vs Mercado Cripto Total',
+    mc_name: 'Market Cap Total — todo el cripto', mc_change: 'Cambio 24h:',
+    stable_name: 'Stablecoins — dinero en reserva', of_total: 'del mercado total',
+    calculating: 'Calculando señal...',
+    agent_explains: '📊 El agente explica',
+    how_to_read: 'Cómo leer esta métrica',
+    leg1_k: 'Stables ↑ + mercado ↑:', leg1_v: 'capital nuevo entrando (alcista)',
+    leg2_k: 'Stables ↑ + mercado ↓:', leg2_v: 'la gente se refugia (bajista)',
+    leg3_k: 'Stables ↓ + mercado ↑:', leg3_v: 'rotación activa a cripto (muy alcista)',
+    leg4_k: 'Stables ↓ + mercado ↓:', leg4_v: 'salida general del ecosistema',
+    title_decisions: 'Últimas Decisiones del Agente',
+    no_decisions: 'Sin decisiones registradas',
+    title_log: 'Log en Vivo', log_loading: 'Cargando log...',
+    title_narratives: 'Narrativas del Mercado — últimos 15 días',
+    nar1_title: '🤖 Agentes IA',
+    nar1_desc: 'Tokens vinculados a agentes autónomos de inteligencia artificial y automatización on-chain.',
+    nar2_desc: 'Infraestructura física descentralizada: redes de sensores, computación y conectividad con incentivos tokenizados.',
+    nar3_desc: 'Finanzas descentralizadas: protocolos de lending, DEX y yield en auge esta semana en BSC.',
+    news: 'noticias', trending: '↑ Tendencia',
+    pro_title: 'Narrativas reales con CMC Pro',
+    pro_desc: 'Noticias reales, conteo de KOLs y sentimiento por narrativa<br>vía CoinMarketCap AI Agent Hub · <strong style="color:var(--text)">Disponible el lunes</strong>',
+    coming_soon: '🚀 Próximamente',
+    pitch_title: '¿Querés que este agente opere<br>en tu exchange favorito?',
+    pitch_desc: 'Conectá tu API key con permisos <strong style="color:var(--text)">solo de trading</strong> — el agente nunca puede retirar tus fondos.<br>Vos mantenés el control total de tu cuenta en todo momento.',
+    feat1: '✅ Self-custody total', feat2: '✅ Sin acceso a retiros', feat3: '✅ Podés desconectar cuando quieras',
+    email_label: 'Dejá tu email y te avisamos cuando esté disponible',
+    btn_access: 'Quiero acceso',
+    pitch_footer: 'Ya vieron los resultados del agente 👆 — vos podés ser el siguiente.',
+    div_rotation: '🟢 ROTACIÓN — Dinero entrando al cripto',
+    div_refuge: '🔴 REFUGIO — Inversores en stablecoins',
+    div_neutral: '🟡 NEUTRAL — Sin señal clara',
+    already_list: '¡Ya estás en la lista!',
+    waitlist_ok: '✅ ¡Listo! Te avisamos cuando esté disponible.',
+    invalid_email: 'Ingresá un email válido.',
+  },
+  en: {
+    status_active: 'ACTIVE',
+    last_cycle_label: 'Last cycle:',
+    kpi_total: 'Total Capital', kpi_total_sub: "Agent's USDT",
+    kpi_dep: 'Deployed Capital', kpi_dep_sub: 'in open positions',
+    kpi_libre: 'Free Capital', kpi_libre_sub: 'available to trade',
+    kpi_pos: 'Open Positions', kpi_cycles: 'Cycles Today', kpi_cycles_sub: 'every 5 minutes',
+    title_positions: 'Open Positions',
+    no_positions: 'No open positions at this time',
+    fg_fear: '😱 Extreme Fear', fg_greed: '🤑 Extreme Greed',
+    loading: 'Loading data...',
+    title_btc: 'BTC Dominance', others: 'Others',
+    title_stables: 'Stablecoins vs Total Crypto Market',
+    mc_name: 'Total Market Cap — all crypto', mc_change: '24h Change:',
+    stable_name: 'Stablecoins — money in reserve', of_total: 'of total market',
+    calculating: 'Calculating signal...',
+    agent_explains: '📊 Agent explains',
+    how_to_read: 'How to read this metric',
+    leg1_k: 'Stables ↑ + market ↑:', leg1_v: 'new capital entering (bullish)',
+    leg2_k: 'Stables ↑ + market ↓:', leg2_v: 'investors taking shelter (bearish)',
+    leg3_k: 'Stables ↓ + market ↑:', leg3_v: 'active rotation into crypto (very bullish)',
+    leg4_k: 'Stables ↓ + market ↓:', leg4_v: 'general exit from the ecosystem',
+    title_decisions: 'Latest Agent Decisions',
+    no_decisions: 'No decisions recorded',
+    title_log: 'Live Log', log_loading: 'Loading log...',
+    title_narratives: 'Market Narratives — last 15 days',
+    nar1_title: '🤖 AI Agents',
+    nar1_desc: 'Tokens linked to autonomous artificial intelligence agents and on-chain automation.',
+    nar2_desc: 'Decentralized physical infrastructure: sensor networks, computing and connectivity with tokenized incentives.',
+    nar3_desc: 'Decentralized finance: lending protocols, DEX and yield booming this week on BSC.',
+    news: 'news', trending: '↑ Trending',
+    pro_title: 'Real Narratives with CMC Pro',
+    pro_desc: 'Real news, KOL count and sentiment by narrative<br>via CoinMarketCap AI Agent Hub · <strong style="color:var(--text)">Available Monday</strong>',
+    coming_soon: '🚀 Coming Soon',
+    pitch_title: 'Want this agent to trade<br>on your favorite exchange?',
+    pitch_desc: 'Connect your API key with <strong style="color:var(--text)">trading-only</strong> permissions — the agent can never withdraw your funds.<br>You keep full control of your account at all times.',
+    feat1: '✅ Total self-custody', feat2: '✅ No withdrawal access', feat3: '✅ Disconnect anytime',
+    email_label: 'Leave your email and we\'ll notify you when it\'s available',
+    btn_access: 'Get early access',
+    pitch_footer: "They've seen the agent's results 👆 — you could be next.",
+    div_rotation: '🟢 ROTATION — Money flowing into crypto',
+    div_refuge: '🔴 SHELTER — Investors in stablecoins',
+    div_neutral: '🟡 NEUTRAL — No clear signal',
+    already_list: 'You\'re already on the list!',
+    waitlist_ok: '✅ Done! We\'ll notify you when it\'s available.',
+    invalid_email: 'Please enter a valid email.',
+  }
+};
+
+let currentLang = localStorage.getItem('lang') || 'es';
+
+// ── Guardar últimos datos para re-render al cambiar idioma ──
+let lastMarketData = null;
+let lastStateData  = null;
+
+function t(key) { return LANGS[currentLang][key] || LANGS.es[key] || key; }
+
+function applyLang() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    const val = t(key);
+    if (val && val.includes('<')) el.innerHTML = val;
+    else if (val) el.textContent = val;
+  });
+  document.getElementById('langToggle').textContent = currentLang === 'es' ? 'EN' : 'ES';
+}
+
+function toggleLang() {
+  currentLang = currentLang === 'es' ? 'en' : 'es';
+  localStorage.setItem('lang', currentLang);
+  applyLang();
+  // Re-renderizar textos dinámicos si hay datos
+  if (lastMarketData) renderMarket(lastMarketData);
+  if (lastStateData)  renderState(lastStateData);
+}
+
 let countdown = 30;
+applyLang();
+
 setInterval(() => {
   countdown--;
   document.getElementById('countdown').textContent = countdown;
@@ -790,6 +990,27 @@ setInterval(() => {
 }, 1000);
 
 fetchAll();
+
+function joinWaitlist() {
+  const email = document.getElementById('waitlistEmail').value.trim();
+  const msg   = document.getElementById('waitlistMsg');
+  if (!email || !email.includes('@')) {
+    msg.style.color = 'var(--red)';
+    msg.textContent = t('invalid_email');
+    return;
+  }
+  const list = JSON.parse(localStorage.getItem('waitlist') || '[]');
+  if (list.includes(email)) {
+    msg.style.color = 'var(--gold)';
+    msg.textContent = t('already_list');
+    return;
+  }
+  list.push(email);
+  localStorage.setItem('waitlist', JSON.stringify(list));
+  msg.style.color = 'var(--green)';
+  msg.textContent = t('waitlist_ok');
+  document.getElementById('waitlistEmail').value = '';
+}
 </script>
 </body>
 </html>

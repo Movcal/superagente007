@@ -318,15 +318,12 @@ body {
   line-height: 2;
 }
 
-/* ── NARRATIVES (placeholder) ────────────── */
+/* ── NARRATIVES ──────────────────────────── */
 .narratives-wrapper { position: relative; }
 .narratives-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
-  filter: blur(2px);
-  opacity: .45;
-  pointer-events: none;
 }
 .nar-card {
   background: var(--card2);
@@ -337,20 +334,6 @@ body {
 .nar-title { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
 .nar-desc  { font-size: 12px; color: var(--muted); margin-bottom: 12px; line-height: 1.5; }
 .nar-stats { display: flex; gap: 8px; flex-wrap: wrap; }
-
-.pro-overlay {
-  position: absolute;
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-  background: rgba(13,17,23,.92);
-  border: 1px solid var(--gold);
-  border-radius: 14px;
-  padding: 22px 32px;
-  text-align: center;
-  backdrop-filter: blur(6px);
-  z-index: 10;
-  min-width: 320px;
-}
 
 /* ── DECISIONS + LOG ─────────────────────── */
 .two-col {
@@ -570,50 +553,110 @@ body {
 
   </div>
 
-  <!-- NARRATIVAS (CMC Pro) -->
+  <!-- NARRATIVAS (CMC MCP - datos reales) -->
   <div class="card">
-    <div class="card-title" data-i18n="title_narratives">Narrativas del Mercado — últimos 15 días</div>
+    <div class="card-title" data-i18n="title_narratives">Narrativas del Mercado <span style="color:var(--green);font-size:9px;margin-left:6px;">● LIVE · CMC</span></div>
     <div class="narratives-wrapper">
-      <div class="narratives-grid">
-        <div class="nar-card">
-          <div class="nar-title" style="color:var(--gold)" data-i18n="nar1_title">🤖 Agentes IA</div>
-          <div class="nar-desc" data-i18n="nar1_desc">Tokens vinculados a agentes autónomos de inteligencia artificial y automatización on-chain.</div>
-          <div class="nar-stats">
-            <span class="tag">📰 12 <span data-i18n="news">noticias</span></span>
-            <span class="tag">👥 47 KOLs</span>
-            <span class="tag green" data-i18n="trending">↑ Tendencia</span>
-          </div>
-        </div>
-        <div class="nar-card">
-          <div class="nar-title" style="color:var(--blue)">📡 DePIN</div>
-          <div class="nar-desc" data-i18n="nar2_desc">Infraestructura física descentralizada: redes de sensores, computación y conectividad con incentivos tokenizados.</div>
-          <div class="nar-stats">
-            <span class="tag">📰 8 <span data-i18n="news">noticias</span></span>
-            <span class="tag">👥 23 KOLs</span>
-            <span class="tag">→ Neutral</span>
-          </div>
-        </div>
-        <div class="nar-card">
-          <div class="nar-title" style="color:var(--green)">💎 DeFi</div>
-          <div class="nar-desc" data-i18n="nar3_desc">Finanzas descentralizadas: protocolos de lending, DEX y yield en auge esta semana en BSC.</div>
-          <div class="nar-stats">
-            <span class="tag">📰 19 <span data-i18n="news">noticias</span></span>
-            <span class="tag">👥 61 KOLs</span>
-            <span class="tag green" data-i18n="trending">↑ Tendencia</span>
-          </div>
-        </div>
-      </div>
-      <div class="pro-overlay">
-        <div style="font-size:28px; margin-bottom:10px">🔒</div>
-        <div style="font-weight:800; color:var(--gold); font-size:16px; margin-bottom:6px" data-i18n="pro_title">Narrativas reales con CMC Pro</div>
-        <div style="color:var(--muted); font-size:13px; line-height:1.6" data-i18n="pro_desc">
-          Noticias reales, conteo de KOLs y sentimiento por narrativa<br>
-          vía CoinMarketCap AI Agent Hub · <strong style="color:var(--text)">Disponible el lunes</strong>
-        </div>
+      <div class="narratives-grid" id="narrativesGrid">
+        <div class="empty-state" style="grid-column:1/-1;" data-i18n="loading">Obteniendo datos...</div>
       </div>
     </div>
   </div>
 
+
+  <!-- RECARGA DEL AGENTE -->
+  <div class="card">
+    <div class="card-title" data-i18n="title_fund">Recargar el Agente</div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:32px; flex-wrap:wrap;">
+
+      <!-- Columna izquierda: cómo funciona -->
+      <div>
+        <div style="font-size:13px; color:var(--muted); line-height:1.8; margin-bottom:20px;" data-i18n="fund_desc">
+          El agente opera con stablecoins en BSC. Cuando necesita capital,
+          podés recargarlo directamente desde Telegram — el bot genera un link
+          de pago en MercadoPago, confirmás, y los fondos llegan a la wallet
+          del agente en minutos.
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:12px;">
+
+          <div style="display:flex; align-items:flex-start; gap:14px;">
+            <div style="min-width:28px; height:28px; border-radius:50%; background:var(--gold); color:#000; font-weight:800; font-size:13px; display:flex; align-items:center; justify-content:center;">1</div>
+            <div>
+              <div style="font-size:13px; font-weight:700; color:var(--text); margin-bottom:3px;" data-i18n="fund_step1_title">Registrá tu wallet BSC</div>
+              <div style="font-size:12px; color:var(--muted);" data-i18n="fund_step1_desc">Ingresá la dirección de tu wallet en BSC. El agente la guarda para saber a dónde enviar los fondos.</div>
+            </div>
+          </div>
+
+          <div style="display:flex; align-items:flex-start; gap:14px;">
+            <div style="min-width:28px; height:28px; border-radius:50%; background:var(--gold); color:#000; font-weight:800; font-size:13px; display:flex; align-items:center; justify-content:center;">2</div>
+            <div>
+              <div style="font-size:13px; font-weight:700; color:var(--text); margin-bottom:3px;" data-i18n="fund_step2_title">Conectá con el bot de Telegram</div>
+              <div style="font-size:12px; color:var(--muted);" data-i18n="fund_step2_desc">Hacés clic en el botón, se abre Telegram y tocás Start. El bot ya sabe tu wallet — no tenés que escribir nada más.</div>
+            </div>
+          </div>
+
+          <div style="display:flex; align-items:flex-start; gap:14px;">
+            <div style="min-width:28px; height:28px; border-radius:50%; background:var(--gold); color:#000; font-weight:800; font-size:13px; display:flex; align-items:center; justify-content:center;">3</div>
+            <div>
+              <div style="font-size:13px; font-weight:700; color:var(--text); margin-bottom:3px;" data-i18n="fund_step3_title">Elegí el monto y pagá</div>
+              <div style="font-size:12px; color:var(--muted);" data-i18n="fund_step3_desc">El bot te manda un link de MercadoPago. Confirmás el pago y en minutos el agente recibe USDT/USDC en BSC listo para operar.</div>
+            </div>
+          </div>
+
+          <div style="display:flex; align-items:flex-start; gap:14px;">
+            <div style="min-width:28px; height:28px; border-radius:50%; background:rgba(63,185,80,.2); border:1px solid var(--green); color:var(--green); font-weight:800; font-size:13px; display:flex; align-items:center; justify-content:center;">✓</div>
+            <div>
+              <div style="font-size:13px; font-weight:700; color:var(--green); margin-bottom:3px;" data-i18n="fund_step4_title">El agente opera con tu capital</div>
+              <div style="font-size:12px; color:var(--muted);" data-i18n="fund_step4_desc">Tu wallet mantiene el control. El agente firma cada transacción con Trust Wallet Agent Kit — vos podés auditar cada movimiento on-chain en BSCScan.</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Columna derecha: formulario visual -->
+      <div style="display:flex; flex-direction:column; gap:14px;">
+
+        <div>
+          <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;" data-i18n="fund_wallet_label">Tu wallet BSC</div>
+          <input
+            type="text"
+            placeholder="0x..."
+            id="fundWallet"
+            style="width:100%; background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:10px 14px; color:var(--text); font-size:13px; font-family:'Courier New',monospace; outline:none;"
+            onfocus="this.style.borderColor='var(--gold)'"
+            onblur="this.style.borderColor='var(--border)'"
+          />
+          <div style="font-size:11px; color:var(--muted); margin-top:5px;" data-i18n="fund_wallet_hint">Solo se usa para identificarte. El agente nunca retira fondos sin tu autorización en Telegram.</div>
+        </div>
+
+        <button
+          onclick="connectTelegram()"
+          style="display:flex; align-items:center; justify-content:center; gap:10px; background:#229ED9; border:none; border-radius:10px; padding:14px 20px; color:#fff; font-size:14px; font-weight:700; cursor:pointer; transition:opacity .2s;"
+          onmouseover="this.style.opacity='0.85'"
+          onmouseout="this.style.opacity='1'"
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12L7.26 13.514l-2.956-.924c-.642-.204-.657-.642.136-.953l11.57-4.461c.537-.194 1.006.131.884.945z"/></svg>
+          <span data-i18n="fund_btn">Conectar con Telegram y recargar</span>
+        </button>
+
+        <div id="fundMsg" style="font-size:12px; color:var(--muted); min-height:18px; text-align:center;"></div>
+
+        <!-- Stack tecnológico -->
+        <div style="background:var(--card2); border:1px solid var(--border); border-radius:10px; padding:16px 18px; margin-top:6px;">
+          <div style="font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:10px;" data-i18n="fund_tech_title">Tecnología detrás de la recarga</div>
+          <div style="display:flex; flex-direction:column; gap:7px; font-size:12px; color:var(--muted); line-height:1.6;">
+            <div>⚡ <strong style="color:var(--text)">Telegram Bot (Telethon)</strong> — <span data-i18n="fund_tech1">interfaz conversacional para autorizar el pago</span></div>
+            <div>💳 <strong style="color:var(--text)">MercadoPago</strong> — <span data-i18n="fund_tech2">procesamiento del pago en moneda local</span></div>
+            <div>🔗 <strong style="color:var(--text)">Trust Wallet Agent Kit</strong> — <span data-i18n="fund_tech3">firma y envío de USDT/USDC a BSC sin custodia</span></div>
+            <div>🛡️ <strong style="color:var(--text)">Self-custody</strong> — <span data-i18n="fund_tech4">el agente nunca tiene acceso a retirar fondos hacia afuera</span></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
 
   <!-- SECCION COMERCIAL -->
   <div style="background: linear-gradient(135deg, #161b22 0%, #1c2128 100%); border: 1px solid rgba(240,185,11,0.3); border-radius: 16px; padding: 36px 40px; display: flex; align-items: center; justify-content: space-between; gap: 32px; flex-wrap: wrap;">
@@ -837,19 +880,56 @@ function renderMarket(d) {
   }
 }
 
+// ── Render narratives ───────────────────────────
+function narChangeColor(val) {
+  if (!val) return 'var(--muted)';
+  return val.startsWith('+') ? 'var(--green)' : val.startsWith('-') ? 'var(--red)' : 'var(--muted)';
+}
+
+function renderNarratives(list) {
+  const grid = document.getElementById('narrativesGrid');
+  if (!list || list.length === 0) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;">Sin datos de narrativas</div>`;
+    return;
+  }
+  grid.innerHTML = list.map((n, i) => {
+    const rankColors = ['var(--gold)', 'var(--blue)', 'var(--green)', 'var(--orange)', 'var(--text)', 'var(--muted)'];
+    const color = rankColors[i] || 'var(--muted)';
+    const c24   = n.change_24h || '';
+    const c7d   = n.change_7d  || '';
+    const coins = n.top_coins.length ? n.top_coins.join(' · ') : '—';
+    const kws   = n.keywords.length  ? n.keywords.join(', ')   : '';
+    return `
+      <div class="nar-card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <div class="nar-title" style="color:${color}">#${n.rank} ${esc(n.name)}</div>
+        </div>
+        ${kws ? `<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">${esc(kws)}</div>` : ''}
+        <div class="nar-stats">
+          <span class="tag" style="color:${narChangeColor(c24)}">24h: ${esc(c24) || '—'}</span>
+          <span class="tag" style="color:${narChangeColor(c7d)}">7d: ${esc(c7d) || '—'}</span>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:8px;">Top: <strong style="color:var(--text)">${esc(coins)}</strong></div>
+      </div>`;
+  }).join('');
+}
+
 // ── Fetch & refresh ────────────────────────────
 async function fetchAll() {
   try {
     const token = window.__DT__ || '';
     const headers = token ? { 'X-Dashboard-Token': token } : {};
-    const [sRes, mRes] = await Promise.all([
-      fetch('/api/state',  { headers }),
-      fetch('/api/market', { headers })
+    const [sRes, mRes, nRes] = await Promise.all([
+      fetch('/api/state',      { headers }),
+      fetch('/api/market',     { headers }),
+      fetch('/api/narratives', { headers }),
     ]);
     lastStateData  = await sRes.json();
     lastMarketData = await mRes.json();
+    const nData    = await nRes.json();
     renderState(lastStateData);
     renderMarket(lastMarketData);
+    renderNarratives(nData.narratives || []);
   } catch (e) {
     console.error('Error:', e);
   }
@@ -903,6 +983,27 @@ const LANGS = {
     already_list: '¡Ya estás en la lista!',
     waitlist_ok: '✅ ¡Listo! Te avisamos cuando esté disponible.',
     invalid_email: 'Ingresá un email válido.',
+    title_fund: 'Recargar el Agente',
+    fund_desc: 'El agente opera con stablecoins en BSC. Cuando necesita capital, podés recargarlo directamente desde Telegram — el bot genera un link de pago en MercadoPago, confirmás, y los fondos llegan a la wallet del agente en minutos.',
+    fund_step1_title: 'Registrá tu wallet BSC',
+    fund_step1_desc: 'Ingresá la dirección de tu wallet en BSC. El agente la guarda para saber a dónde enviar los fondos.',
+    fund_step2_title: 'Conectá con el bot de Telegram',
+    fund_step2_desc: 'Hacés clic en el botón, se abre Telegram y tocás Start. El bot ya sabe tu wallet — no tenés que escribir nada más.',
+    fund_step3_title: 'Elegí el monto y pagá',
+    fund_step3_desc: 'El bot te manda un link de MercadoPago. Confirmás el pago y en minutos el agente recibe USDT/USDC en BSC listo para operar.',
+    fund_step4_title: 'El agente opera con tu capital',
+    fund_step4_desc: 'Tu wallet mantiene el control. El agente firma cada transacción con Trust Wallet Agent Kit — podés auditar cada movimiento on-chain en BSCScan.',
+    fund_wallet_label: 'Tu wallet BSC',
+    fund_wallet_hint: 'Solo se usa para identificarte. El agente nunca retira fondos sin tu autorización en Telegram.',
+    fund_btn: 'Conectar con Telegram y recargar',
+    fund_tech_title: 'Tecnología detrás de la recarga',
+    fund_tech1: 'interfaz conversacional para autorizar el pago',
+    fund_tech2: 'procesamiento del pago en moneda local',
+    fund_tech3: 'firma y envío de USDT/USDC a BSC sin custodia',
+    fund_tech4: 'el agente nunca tiene acceso a retirar fondos hacia afuera',
+    fund_wallet_required: 'Ingresá tu wallet BSC primero.',
+    fund_wallet_invalid: 'La wallet debe comenzar con 0x y tener 42 caracteres.',
+    fund_connecting: '✅ Wallet guardada. Abriendo Telegram...',
   },
   en: {
     status_active: 'ACTIVE',
@@ -950,6 +1051,27 @@ const LANGS = {
     already_list: 'You\'re already on the list!',
     waitlist_ok: '✅ Done! We\'ll notify you when it\'s available.',
     invalid_email: 'Please enter a valid email.',
+    title_fund: 'Fund the Agent',
+    fund_desc: 'The agent operates with stablecoins on BSC. When it needs capital, you can fund it directly from Telegram — the bot generates a payment link, you confirm, and funds arrive at the agent\'s wallet in minutes.',
+    fund_step1_title: 'Register your BSC wallet',
+    fund_step1_desc: 'Enter your BSC wallet address. The agent saves it to know where to send the funds.',
+    fund_step2_title: 'Connect with the Telegram bot',
+    fund_step2_desc: 'Click the button, Telegram opens and you tap Start. The bot already knows your wallet — no need to type anything else.',
+    fund_step3_title: 'Choose amount and pay',
+    fund_step3_desc: 'The bot sends you a MercadoPago link. Confirm the payment and in minutes the agent receives USDT/USDC on BSC ready to trade.',
+    fund_step4_title: 'The agent trades with your capital',
+    fund_step4_desc: 'Your wallet stays in control. The agent signs every transaction with Trust Wallet Agent Kit — you can audit every move on-chain in BSCScan.',
+    fund_wallet_label: 'Your BSC wallet',
+    fund_wallet_hint: 'Only used to identify you. The agent never withdraws funds without your Telegram authorization.',
+    fund_btn: 'Connect with Telegram and fund',
+    fund_tech_title: 'Technology behind the funding',
+    fund_tech1: 'conversational interface to authorize payment',
+    fund_tech2: 'payment processing in local currency',
+    fund_tech3: 'sign and send USDT/USDC to BSC without custody',
+    fund_tech4: 'the agent never has access to withdraw funds externally',
+    fund_wallet_required: 'Enter your BSC wallet first.',
+    fund_wallet_invalid: 'Wallet must start with 0x and be 42 characters.',
+    fund_connecting: '✅ Wallet saved. Opening Telegram...',
   }
 };
 
@@ -990,6 +1112,24 @@ setInterval(() => {
 }, 1000);
 
 fetchAll();
+
+function connectTelegram() {
+  const wallet = document.getElementById('fundWallet').value.trim();
+  const msg    = document.getElementById('fundMsg');
+  if (!wallet) {
+    msg.style.color = 'var(--red)';
+    msg.textContent = t('fund_wallet_required');
+    return;
+  }
+  if (!wallet.startsWith('0x') || wallet.length !== 42) {
+    msg.style.color = 'var(--red)';
+    msg.textContent = t('fund_wallet_invalid');
+    return;
+  }
+  msg.style.color = 'var(--green)';
+  msg.textContent = t('fund_connecting');
+  // En producción: window.open(`https://t.me/TU_BOT?start=${wallet}`, '_blank');
+}
 
 function joinWaitlist() {
   const email = document.getElementById('waitlistEmail').value.trim();

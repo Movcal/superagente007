@@ -15,6 +15,7 @@ Activar el dia de la competicion (22 junio) cambiando .env
 """
 import os
 import json
+import time
 import requests
 from datetime import datetime
 from dotenv import load_dotenv
@@ -35,6 +36,11 @@ CLAUDE_MODEL = "claude-haiku-4-5-20251001"
 
 # Cache de IDs CMC para no repetir busquedas
 _id_cache = {}
+
+# Cache de contexto macro (narrativas, metricas globales, eventos macro)
+# Estos datos son iguales para todos los tokens en el mismo ciclo — se reusan 15 min
+_macro_cache = {"data": None, "ts": 0}
+MACRO_CACHE_TTL = 900  # 15 minutos
 
 
 def log(msg):
@@ -186,15 +192,44 @@ def fetch_macro_events(client):
 
 # ── Contexto completo para Claude ─────────────────────────────────────────────
 
+def _get_macro_context(client):
+    """
+    Datos macro compartidos entre todos los tokens del mismo ciclo.
+    Se cachean 15 minutos — narrativas, metricas globales y eventos macro
+    no cambian entre evaluaciones consecutivas del mismo ciclo.
+    """
+    now = time.time()
+    if _macro_cache["data"] and (now - _macro_cache["ts"]) < MACRO_CACHE_TTL:
+        log(f"Macro context desde cache ({int((now - _macro_cache['ts']) / 60)}m de antiguedad)")
+        return _macro_cache["data"]
+
+    macro = {
+        "global_metrics":      fetch_global_metrics(client),
+        "trending_narratives": fetch_trending_narratives(client),
+        "macro_events":        fetch_macro_events(client),
+    }
+    _macro_cache["data"] = macro
+    _macro_cache["ts"]   = now
+    log("Macro context actualizado desde CMC MCP")
+    return macro
+
+
 def build_context(symbol):
-    """Arma el contexto de mercado via CMC MCP."""
+    """
+    Arma el contexto de mercado via CMC MCP.
+    - Datos macro (narrativas, metricas, eventos): cacheados 15 min, compartidos entre tokens.
+    - Datos del token (noticias, tecnico): siempre frescos, especificos por symbol.
+    """
     client = CMCMCPClient()
-    ctx = {}
-    ctx["global_metrics"]       = fetch_global_metrics(client)
-    ctx["technical_analysis"]   = fetch_technical_analysis(client, symbol)
-    ctx["token_news"]           = fetch_token_news(client, symbol)
-    ctx["trending_narratives"]  = fetch_trending_narratives(client)
-    ctx["macro_events"]         = fetch_macro_events(client)
+    macro  = _get_macro_context(client)
+
+    ctx = {
+        "global_metrics":      macro["global_metrics"],
+        "trending_narratives": macro["trending_narratives"],
+        "macro_events":        macro["macro_events"],
+        "technical_analysis":  fetch_technical_analysis(client, symbol),
+        "token_news":          fetch_token_news(client, symbol),
+    }
     return ctx
 
 
@@ -259,7 +294,7 @@ Respondé SOLO con JSON valido, sin texto extra:
         client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
         msg = client.messages.create(
             model=CLAUDE_MODEL,
-            max_tokens=256,
+            max_tokens=512,
             messages=[{"role": "user", "content": prompt}]
         )
         raw = msg.content[0].text.strip()

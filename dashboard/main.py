@@ -6,7 +6,7 @@ from fastapi import FastAPI, Header, HTTPException, Depends
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
-import json, os, re, requests
+import json, os, re, requests, time
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -19,6 +19,12 @@ load_dotenv(BASE_DIR / ".env")
 CAPITAL_TOTAL     = float(os.getenv("CAPITAL_TOTAL", 100))
 MAX_POSICIONES    = int(os.getenv("MAX_POSICIONES", 2))
 DASHBOARD_TOKEN   = os.getenv("DASHBOARD_TOKEN", "")
+CMC_API_KEY       = os.getenv("CMC_API_KEY", "")
+CMC_MCP_URL       = "https://mcp.coinmarketcap.com/mcp"
+
+# Cache de narrativas (10 minutos)
+_narratives_cache = {"data": None, "ts": 0}
+NARRATIVES_TTL    = 600  # segundos
 
 app = FastAPI(title="Superagente007 Dashboard")
 
@@ -104,6 +110,65 @@ def fmt_usd(v):
     if v >= 1e9:  return f"${v/1e9:.1f}B"
     if v >= 1e6:  return f"${v/1e6:.1f}M"
     return f"${v:,.0f}"
+
+
+# ── CMC MCP helper ────────────────────────────────────────────────────────────
+
+def fetch_narratives_from_mcp():
+    """Llama al CMC MCP para obtener narrativas trending. Resultado cacheado 10 min."""
+    now = time.time()
+    if _narratives_cache["data"] and (now - _narratives_cache["ts"]) < NARRATIVES_TTL:
+        return _narratives_cache["data"]
+
+    try:
+        headers = {
+            "X-CMC-MCP-API-KEY": CMC_API_KEY,
+            "Content-Type": "application/json",
+            "Accept": "application/json, text/event-stream"
+        }
+        s = requests.Session()
+        s.headers.update(headers)
+        s.post(CMC_MCP_URL, json={
+            "jsonrpc": "2.0", "id": 1, "method": "initialize",
+            "params": {"protocolVersion": "2025-03-26", "capabilities": {},
+                       "clientInfo": {"name": "dashboard", "version": "1.0"}}
+        }, timeout=10)
+        s.post(CMC_MCP_URL, json={"jsonrpc": "2.0", "method": "notifications/initialized"}, timeout=5)
+
+        r = s.post(CMC_MCP_URL, json={
+            "jsonrpc": "2.0", "id": 2, "method": "tools/call",
+            "params": {"name": "trending_crypto_narratives", "arguments": {}}
+        }, timeout=15)
+
+        text = r.json().get("result", {}).get("content", [{}])[0].get("text", "")
+        raw  = json.loads(text)
+        rows = raw.get("categoryList", {}).get("rows", [])
+
+        narratives = []
+        for row in rows[:6]:
+            change_24h = row[5] if len(row) > 5 else ""
+            change_7d  = row[6] if len(row) > 6 else ""
+            keywords   = row[15] if len(row) > 15 else []
+            top_coins  = []
+            if len(row) > 17 and isinstance(row[17], dict):
+                coin_rows = row[17].get("rows", [])
+                top_coins = [c[0] for c in coin_rows[:3] if c]
+
+            narratives.append({
+                "rank":       row[0],
+                "name":       row[3] if len(row) > 3 else "",
+                "url":        row[2] if len(row) > 2 else "",
+                "change_24h": change_24h,
+                "change_7d":  change_7d,
+                "keywords":   keywords[:3] if isinstance(keywords, list) else [],
+                "top_coins":  top_coins,
+            })
+
+        _narratives_cache["data"] = narratives
+        _narratives_cache["ts"]   = now
+        return narratives
+    except Exception:
+        return _narratives_cache["data"] or []
 
 
 # ── endpoints ─────────────────────────────────────────────────────────────────
@@ -247,6 +312,11 @@ async def get_market():
         pass
 
     return result
+
+
+@app.get("/api/narratives", dependencies=[Depends(verify_token)])
+async def get_narratives():
+    return {"narratives": fetch_narratives_from_mcp()}
 
 
 if __name__ == "__main__":

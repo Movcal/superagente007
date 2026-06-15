@@ -31,6 +31,14 @@ TOKENS = [
     "M","U","STABLE","H","FF","B","BabyDoge"
 ]
 
+# Stablecoins y tokens de precio fijo — excluir del escaner de volumen
+# (nunca tendran sentimiento positivo para trading)
+STABLECOINS = {
+    "USDT","USDC","DAI","BUSD","TUSD","FDUSD","FRAX","FRXUSD","USDD","USD1",
+    "USDe","USDf","USDF","DUSD","XUSD","EURI","lisUSD","STABLE","XAUM","XAUt",
+    "SMILEK","GUA","M","U"
+}
+
 # Tokens prioritarios del ecosistema BNB (watchlist especial)
 PRIORITY_TOKENS = ["BNB", "CAKE", "ASTER", "FLOKI"]
 
@@ -107,6 +115,8 @@ def check_volume_spikes(current_volumes, history):
     alerts = []
     for symbol, current_vol in current_volumes.items():
         if current_vol == 0:
+            continue
+        if symbol in STABLECOINS:
             continue
 
         past_readings = history.get(symbol, [])

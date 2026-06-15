@@ -93,6 +93,48 @@ Funciona como la capa de datos del agente: precios, señales tecnicas, sentimien
 
 ---
 
+## MCP con API key (CONFIRMADO - sin pago por llamada)
+> Fuente: https://coinmarketcap.com/api/documentation/ai-agent-hub/mcp
+> Actualizado: 2026-06-15
+
+### Endpoint
+`https://mcp.coinmarketcap.com/mcp`
+
+### Autenticacion
+Header: `X-CMC-MCP-API-KEY: TU_API_KEY`
+(misma API key del plan Professional)
+
+### Configuracion MCP
+```json
+{
+  "mcpServers": {
+    "cmc-mcp": {
+      "url": "https://mcp.coinmarketcap.com/mcp",
+      "headers": {
+        "X-CMC-MCP-API-KEY": "TU_API_KEY"
+      }
+    }
+  }
+}
+```
+
+### 12 herramientas incluidas
+- Cotizaciones en vivo (precios, market cap, volumen)
+- Metricas globales: Fear & Greed, dominancia BTC/ETH, cap total
+- Indicadores tecnicos: MA, EMA, MACD, RSI, Fibonacci
+- Noticias recientes por criptomoneda
+- Busqueda semantica de conceptos
+- Narrativas de tendencias del mercado
+- Datos on-chain: distribucion de direcciones, ballenas vs retail
+- Datos de derivados: funding rate, interes abierto, apalancamiento global
+- Eventos macroeconomicos
+
+### Pendiente confirmar
+- Si las 193 Skills del marketplace estan incluidas o solo estas 12 herramientas
+- El endpoint `/v2/agent/skill` NO existe como REST — Skills se acceden solo via MCP o x402
+
+---
+
 ## x402 - Detalle tecnico completo
 > Fuente: https://pro.coinmarketcap.com/api/documentation/ai-agent-hub/x402
 

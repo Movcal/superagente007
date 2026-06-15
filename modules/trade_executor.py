@@ -3,6 +3,7 @@ import shutil
 import json
 import os
 import sys
+import requests
 import pathlib
 from datetime import datetime
 from dotenv import load_dotenv
@@ -13,8 +14,11 @@ load_dotenv()
 from modules.token_registry import get_contract
 
 WALLET_PASSWORD = os.getenv("TWAK_WALLET_PASSWORD")
-POSITIONS_FILE = "data/open_positions.json"
-TRADES_LOG = "logs/trades.log"
+CMC_API_KEY     = os.getenv("CMC_API_KEY", "")
+PAPER_MODE      = os.getenv("PAPER_MODE", "false").lower() == "true"
+POSITIONS_FILE  = "data/open_positions.json"
+PAPER_TRADES_FILE = "data/paper_trades.json"
+TRADES_LOG      = "logs/trades.log"
 
 # Token de compra base (todo el capital en USDT antes de comprar)
 BASE_TOKEN = "USDT"
@@ -80,6 +84,108 @@ def run_twak(args):
         return None
 
 
+# ── Paper mode helpers ────────────────────────────────────────────────────────
+
+def load_paper_trades():
+    if os.path.exists(PAPER_TRADES_FILE):
+        with open(PAPER_TRADES_FILE, "r") as f:
+            return json.load(f)
+    return []
+
+def save_paper_trades(trades):
+    os.makedirs("data", exist_ok=True)
+    with open(PAPER_TRADES_FILE, "w") as f:
+        json.dump(trades, f, indent=2)
+
+def get_real_price(symbol):
+    """Obtiene el precio real de un token via CMC API."""
+    try:
+        r = requests.get(
+            "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest",
+            headers={"X-CMC_PRO_API_KEY": CMC_API_KEY},
+            params={"symbol": symbol, "convert": "USD"},
+            timeout=10
+        )
+        if r.status_code == 200:
+            data = r.json().get("data", {})
+            for key in data:
+                price = data[key]["quote"]["USD"]["price"]
+                return round(price, 8)
+    except Exception as e:
+        log(f"Error obteniendo precio de {symbol}: {e}")
+    return None
+
+def paper_buy(decision):
+    """Simula una compra con precio real de CMC. Sin blockchain."""
+    symbol  = decision["symbol"]
+    capital = decision["capital"]
+
+    price = get_real_price(symbol)
+    if not price:
+        log(f"[PAPER] No se pudo obtener precio de {symbol}, usando precio simulado")
+        price = 1.0
+
+    tokens_bought = round(capital / price, 6)
+    log(f"[PAPER] COMPRA SIMULADA: {tokens_bought} {symbol} @ ${price} = ${capital} USDT")
+
+    position = {
+        "symbol":          symbol,
+        "capital":         capital,
+        "entry_price":     price,
+        "tokens":          tokens_bought,
+        "entry_time":      decision["entry_time"],
+        "hold_min_hours":  decision["hold_min_hours"],
+        "hold_max_hours":  decision["hold_max_hours"],
+        "sentiment":       decision["sentiment"],
+        "volume_ratio":    decision["volume_ratio"],
+        "narrative":       decision["narrative"],
+        "reasoning":       decision["reasoning"],
+        "swap_result":     {"paper": True, "price": price, "tokens": tokens_bought},
+        "status":          "OPEN",
+        "paper":           True,
+    }
+
+    # Registrar en paper_trades
+    trades = load_paper_trades()
+    trades.append({**position, "type": "BUY", "timestamp": datetime.utcnow().isoformat()})
+    save_paper_trades(trades)
+
+    return position
+
+def paper_sell(position, reason="señal de salida"):
+    """Simula una venta con precio real de CMC. Calcula PnL."""
+    symbol  = position["symbol"]
+    capital = position["capital"]
+    entry_price = position.get("entry_price", 1.0)
+    tokens = position.get("tokens", capital)
+
+    exit_price = get_real_price(symbol) or entry_price
+    exit_value = round(tokens * exit_price, 4)
+    pnl_usd    = round(exit_value - capital, 4)
+    pnl_pct    = round((pnl_usd / capital) * 100, 2)
+
+    log(f"[PAPER] VENTA SIMULADA: {tokens} {symbol} @ ${exit_price} = ${exit_value} USDT")
+    log(f"[PAPER] PnL: ${pnl_usd} ({pnl_pct:+.2f}%) | Razon: {reason}")
+
+    trades = load_paper_trades()
+    trades.append({
+        "type":        "SELL",
+        "symbol":      symbol,
+        "tokens":      tokens,
+        "entry_price": entry_price,
+        "exit_price":  exit_price,
+        "capital_in":  capital,
+        "exit_value":  exit_value,
+        "pnl_usd":     pnl_usd,
+        "pnl_pct":     pnl_pct,
+        "reason":      reason,
+        "timestamp":   datetime.utcnow().isoformat(),
+        "paper":       True,
+    })
+    save_paper_trades(trades)
+    return True
+
+
 def resolve_token(symbol):
     """Resuelve el contrato BSC de un token o retorna el simbolo si no se encuentra."""
     contract = get_contract(symbol)
@@ -117,13 +223,23 @@ def execute_swap(from_token, to_token, amount_usd):
 def buy(decision):
     """
     Compra el token indicado en la decision.
+    En PAPER_MODE simula la compra con precio real sin tocar blockchain.
     Retorna la posicion abierta o None si fallo.
     """
     symbol = decision["symbol"]
     capital = decision["capital"]
 
-    log(f"=== COMPRANDO {symbol} con ${capital} USDT ===")
+    log(f"=== {'[PAPER] ' if PAPER_MODE else ''}COMPRANDO {symbol} con ${capital} USDT ===")
     log(f"Razonamiento: {decision['reasoning'].splitlines()[0]}")
+
+    if PAPER_MODE:
+        position = paper_buy(decision)
+        if position:
+            positions = load_positions()
+            positions.append(position)
+            save_positions(positions)
+            log(f"[PAPER] POSICION ABIERTA: {symbol} | ${capital} | Hold: {decision['hold_min_hours']}-{decision['hold_max_hours']}h")
+        return position
 
     # Primero cotizar para verificar
     quote = get_quote(BASE_TOKEN, symbol, capital)
@@ -139,7 +255,6 @@ def buy(decision):
         log(f"Swap fallido para {symbol}")
         return None
 
-    # Registrar posicion abierta
     position = {
         "symbol": symbol,
         "capital": capital,
@@ -165,29 +280,37 @@ def buy(decision):
 def sell(position, reason="señal de salida"):
     """
     Vende el token de una posicion abierta.
+    En PAPER_MODE simula la venta con precio real y calcula PnL.
     """
     symbol = position["symbol"]
-    capital = position["capital"]
 
-    log(f"=== VENDIENDO {symbol} | Razon: {reason} ===")
+    log(f"=== {'[PAPER] ' if PAPER_MODE else ''}VENDIENDO {symbol} | Razon: {reason} ===")
 
-    swap_result = execute_swap(symbol, BASE_TOKEN, capital)
-    if not swap_result:
-        log(f"Swap de venta fallido para {symbol}")
-        return False
+    if PAPER_MODE:
+        ok = paper_sell(position, reason)
+    else:
+        # Usar 99.9% del balance de tokens para evitar error de balance insuficiente
+        # por diferencias de decimales entre cotizacion y balance real
+        tokens = position.get("tokens", 0)
+        amount_to_sell = round(tokens * 0.999, 8)
+        log(f"Vendiendo {amount_to_sell} {symbol} (99.9% de {tokens})")
+        swap_result = execute_swap(symbol, BASE_TOKEN, amount_to_sell)
+        if not swap_result:
+            log(f"Swap de venta fallido para {symbol}")
+            return False
+        ok = True
 
-    # Actualizar posicion como cerrada
-    positions = load_positions()
-    for p in positions:
-        if p["symbol"] == symbol and p["status"] == "OPEN":
-            p["status"] = "CLOSED"
-            p["exit_time"] = datetime.utcnow().isoformat()
-            p["exit_reason"] = reason
-            p["exit_swap"] = swap_result
-    save_positions(positions)
+    if ok:
+        positions = load_positions()
+        for p in positions:
+            if p["symbol"] == symbol and p["status"] == "OPEN":
+                p["status"] = "CLOSED"
+                p["exit_time"] = datetime.utcnow().isoformat()
+                p["exit_reason"] = reason
+        save_positions(positions)
+        log(f"POSICION CERRADA: {symbol} | Razon: {reason}")
 
-    log(f"POSICION CERRADA: {symbol} | Razon: {reason}")
-    return True
+    return ok
 
 
 def compliance_trade():

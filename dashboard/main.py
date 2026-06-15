@@ -319,6 +319,64 @@ async def get_narratives():
     return {"narratives": fetch_narratives_from_mcp()}
 
 
+@app.get("/api/costs", dependencies=[Depends(verify_token)])
+async def get_costs():
+    """Resumen de costos: Claude API + trades simulados (paper mode)."""
+
+    # Costos de Claude
+    claude_calls = 0
+    claude_cost_total = 0.0
+    claude_tokens_in  = 0
+    claude_tokens_out = 0
+    cost_log = BASE_DIR / "logs" / "claude_costs.log"
+    if cost_log.exists():
+        for line in cost_log.read_text(encoding="utf-8", errors="ignore").splitlines():
+            try:
+                parts = line.split("|")
+                for p in parts:
+                    p = p.strip()
+                    if p.startswith("in="):
+                        claude_tokens_in  += int(p.split("=")[1].split()[0])
+                        claude_tokens_out += int(p.split("out=")[1].split()[0])
+                    if p.startswith("cost="):
+                        claude_cost_total += float(p.replace("cost=$",""))
+                claude_calls += 1
+            except Exception:
+                pass
+
+    # Trades simulados
+    paper_file = BASE_DIR / "data" / "paper_trades.json"
+    paper_trades = []
+    total_pnl = 0.0
+    total_invested = 0.0
+    if paper_file.exists():
+        try:
+            all_trades = json.loads(paper_file.read_text(encoding="utf-8"))
+            sells = [t for t in all_trades if t.get("type") == "SELL"]
+            buys  = [t for t in all_trades if t.get("type") == "BUY"]
+            total_invested = sum(t.get("capital", 0) for t in buys)
+            total_pnl = sum(t.get("pnl_usd", 0) for t in sells)
+            paper_trades = sells[-10:]  # ultimas 10 ventas
+        except Exception:
+            pass
+
+    return {
+        "claude": {
+            "calls":       claude_calls,
+            "tokens_in":   claude_tokens_in,
+            "tokens_out":  claude_tokens_out,
+            "cost_usd":    round(claude_cost_total, 5),
+            "cost_per_call": round(claude_cost_total / claude_calls, 5) if claude_calls else 0,
+        },
+        "paper_trading": {
+            "total_invested_usd": round(total_invested, 2),
+            "total_pnl_usd":      round(total_pnl, 4),
+            "total_pnl_pct":      round((total_pnl / total_invested * 100), 2) if total_invested else 0,
+            "recent_trades":      paper_trades,
+        }
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="127.0.0.1", port=8080, reload=True,

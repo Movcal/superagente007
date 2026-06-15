@@ -9,15 +9,138 @@ from dotenv import load_dotenv
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 load_dotenv()
 
-CMC_API_KEY = os.getenv("CMC_API_KEY")
+CMC_API_KEY    = os.getenv("CMC_API_KEY")
+CMC_MCP_URL    = "https://mcp.coinmarketcap.com/mcp"
 POSITIONS_FILE = "data/open_positions.json"
-WATCHER_LOG = "logs/position_watcher.log"
+WATCHER_LOG    = "logs/position_watcher.log"
 COMPLIANCE_FILE = "data/compliance_trades.json"
 
 # Umbrales de salida
-TAKE_PROFIT_PCT = 15.0   # salir si sube 15%
-STOP_LOSS_PCT = -8.0     # salir si baja 8%
+TAKE_PROFIT_PCT   = 15.0   # salir si sube 15%
+STOP_LOSS_PCT     = -8.0   # salir si baja 8%
 BTC_DROP_ALERT_PCT = -3.0  # salir de alts si BTC cae 3%
+
+# Palabras clave de noticias negativas que fuerzan salida inmediata
+NEWS_EXIT_KEYWORDS = [
+    "hack", "exploit", "rug", "scam", "fraud", "arrest", "ban",
+    "sec", "lawsuit", "breach", "attack", "stolen", "insolvent",
+    "bankrupt", "shutdown", "suspend", "delist", "delisted"
+]
+
+# Cache de IDs CMC para el watcher
+_watcher_id_cache = {}
+
+
+# ── Cliente MCP liviano para el watcher ──────────────────────────────────────
+
+def _mcp_session():
+    """Crea y devuelve una sesion MCP inicializada."""
+    s = requests.Session()
+    s.headers.update({
+        "X-CMC-MCP-API-KEY": CMC_API_KEY,
+        "Content-Type": "application/json",
+        "Accept": "application/json, text/event-stream"
+    })
+    s.post(CMC_MCP_URL, json={
+        "jsonrpc": "2.0", "id": 1, "method": "initialize",
+        "params": {"protocolVersion": "2025-03-26", "capabilities": {},
+                   "clientInfo": {"name": "watcher", "version": "1.0"}}
+    }, timeout=10)
+    s.post(CMC_MCP_URL, json={"jsonrpc": "2.0", "method": "notifications/initialized"}, timeout=5)
+    return s
+
+def _mcp_call(session, tool, args={}):
+    try:
+        r = session.post(CMC_MCP_URL, json={
+            "jsonrpc": "2.0", "id": 2, "method": "tools/call",
+            "params": {"name": tool, "arguments": args}
+        }, timeout=20)
+        text = r.json().get("result", {}).get("content", [{}])[0].get("text", "")
+        if text and not text.startswith("error:"):
+            return json.loads(text)
+    except Exception:
+        pass
+    return None
+
+def _get_cmc_id(session, symbol):
+    if symbol in _watcher_id_cache:
+        return _watcher_id_cache[symbol]
+    result = _mcp_call(session, "search_cryptos", {"query": symbol})
+    if result and isinstance(result, list):
+        for item in result:
+            if item.get("symbol", "").upper() == symbol.upper():
+                _watcher_id_cache[symbol] = item["id"]
+                return item["id"]
+    return None
+
+
+# ── Señales de salida inteligentes via MCP ───────────────────────────────────
+
+def check_mcp_exit_signals(symbol):
+    """
+    Analiza señales de salida usando CMC MCP.
+    Retorna (debe_salir, razon) o (False, None).
+    Señales monitoreadas:
+    - Noticias negativas confirmadas (hack, exploit, ban, etc.)
+    - RSI14 > 75 (sobrecomprado — momentum agotándose)
+    - MACD histogram cruzando a negativo (reversión bajista)
+    - Narrativa del sector saliendo del top 8
+    """
+    try:
+        session = _mcp_session()
+        cmc_id  = _get_cmc_id(session, symbol)
+        if not cmc_id:
+            return False, None
+
+        # 1. Noticias negativas
+        news_data = _mcp_call(session, "get_crypto_latest_news", {"id": cmc_id})
+        if news_data:
+            rows = news_data.get("rows", [])
+            for row in rows[:5]:
+                title   = (row[0] if len(row) > 0 else "").lower()
+                content = (row[1] if len(row) > 1 else "").lower()
+                combined = title + " " + content
+                for kw in NEWS_EXIT_KEYWORDS:
+                    if kw in combined:
+                        return True, f"noticia negativa detectada: '{kw}' en '{row[0][:60]}'"
+
+        # 2. RSI y MACD
+        ta = _mcp_call(session, "get_crypto_technical_analysis", {"id": cmc_id})
+        if ta:
+            rsi14 = float(ta.get("rsi", {}).get("rsi14", 50))
+            macd_hist = float(ta.get("macd", {}).get("histogram", 0))
+
+            if rsi14 > 75:
+                return True, f"RSI14 sobrecomprado ({rsi14:.1f}) — momentum agotándose"
+
+            if rsi14 > 70 and macd_hist < 0:
+                return True, f"RSI alto ({rsi14:.1f}) + MACD histogram negativo ({macd_hist:.6f}) — señal de reversión"
+
+        # 3. Narrativa perdiendo fuerza
+        narratives = _mcp_call(session, "trending_crypto_narratives")
+        if narratives:
+            rows = narratives.get("categoryList", {}).get("rows", [])
+            top8_names = [r[3].lower() if len(r) > 3 else "" for r in rows[:8]]
+            # Buscar si el sector del token sigue en el top 8
+            sector_keywords = {
+                "ASTER": ["aster", "dex", "perp"],
+                "CAKE":  ["binance", "defi", "pancake"],
+                "FLOKI": ["meme", "dog"],
+                "TWT":   ["binance", "wallet"],
+            }
+            kws = sector_keywords.get(symbol.upper(), [symbol.lower()])
+            sector_present = any(
+                any(kw in name for kw in kws)
+                for name in top8_names
+            )
+            if not sector_present and kws:
+                return True, f"narrativa de {symbol} salió del top 8 del mercado"
+
+        return False, None
+
+    except Exception as e:
+        log(f"Error en check_mcp_exit_signals({symbol}): {e}")
+        return False, None
 
 
 def log(msg):
@@ -195,6 +318,12 @@ def check_all_positions():
             continue
 
         should_exit, reason = check_exit_conditions(position, current_price, btc_change)
+
+        # Si las condiciones basicas no disparan salida, verificar señales MCP
+        if not should_exit:
+            should_exit, reason = check_mcp_exit_signals(symbol)
+            if should_exit:
+                log(f"Señal MCP de salida para {symbol}: {reason}")
 
         if should_exit:
             log(f"SALIENDO de {symbol}: {reason}")

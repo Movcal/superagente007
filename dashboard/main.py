@@ -22,9 +22,9 @@ DASHBOARD_TOKEN   = os.getenv("DASHBOARD_TOKEN", "")
 CMC_API_KEY       = os.getenv("CMC_API_KEY", "")
 CMC_MCP_URL       = "https://mcp.coinmarketcap.com/mcp"
 
-# Cache de narrativas (10 minutos)
+# Cache de narrativas (24 horas — el volumen de una narrativa no cambia en minutos)
 _narratives_cache = {"data": None, "ts": 0}
-NARRATIVES_TTL    = 600  # segundos
+NARRATIVES_TTL    = 86400  # segundos
 
 app = FastAPI(title="Superagente007 Dashboard")
 

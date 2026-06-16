@@ -13,22 +13,20 @@ VOLUMEN_TIMEFRAME_MIN = int(os.getenv("VOLUMEN_TIMEFRAME_MIN", 5))
 ALERTS_FILE = "data/volume_alerts.json"
 HISTORY_FILE = "data/volume_history.json"
 
-# 149 tokens permitidos en el hackathon
+# Tokens con liquidez verificada en PancakeSwap BSC (>$10k)
+# Investigacion completa: 2026-06-16 | Script: investigate_liquidity.py
+# De 149 permitidos en el hackathon, 86 tienen pool activa con liquidez suficiente
+# Excluidos: stablecoins (23), baja liquidez <$10k (28), sin par PancakeSwap (10), sin contrato BSC (1)
 TOKENS = [
-    "ETH","USDT","USDC","XRP","TRX","DOGE","ZEC","ADA","LINK","BCH","DAI","TON",
-    "USD1","USDe","LTC","AVAX","SHIB","WLFI","DOT","UNI","ASTER","DEXE","USDD",
-    "ETC","AAVE","ATOM","FIL","INJ","NIGHT","FET","TUSD","BONK","PENGU","CAKE",
-    "SIREN","LUNC","ZRO","KITE","FDUSD","BEAT","BTT","NFT","EDGE","FLOKI","LDO",
-    "PENDLE","NEX","STG","AXS","TWT","HOME","RAY","COMP","GWEI","XCN","GENIUS",
-    "XPL","BAT","SKYAI","APE","IP","SFP","TAG","NXPC","AB","SAHARA","1INCH",
-    "CHEEMS","BANANAS31","RIVER","MYX","RAVE","SNX","FORM","LAB","HTX","USDf",
-    "CTM","BDX","SLX","UB","DUCKY","FRAX","BILL","WFI","KOGE","ALE","FRXUSD",
-    "USDF","GOMINING","VCNT","GUA","DUSD","SMILEK","0G","BEAM","MY","SOON",
-    "REAL","AIOZ","ZIG","YFI","TAC","CYS","ZAMA","TRIA","HUMA","PLUME","ZIL",
-    "XPR","ZETA","NILA","ROSE","VELO","UAI","BRETT","OPEN","BSB","TOSHI","BAS",
-    "ACH","AXL","LUR","ELF","KAVA","APR","IRYS","EURI","XUSD","BARD","DUSK",
-    "SUSHI","PEAQ","COAI","BDCA","XAUM","BNB","PIEVERSE","Q","lisUSD","XAUt",
-    "M","U","STABLE","H","FF","B","BabyDoge"
+    "ETH","XRP","TRX","DOGE","ZEC","ADA","LINK","BCH","TON","LTC",
+    "AVAX","SHIB","WLFI","DOT","UNI","ASTER","DEXE","ETC","AAVE","ATOM",
+    "FIL","INJ","FET","BONK","PENGU","CAKE","SIREN","LUNC","ZRO","BTT",
+    "FLOKI","PENDLE","AXS","TWT","HOME","COMP","XCN","GENIUS","XPL","SKYAI",
+    "APE","SFP","TAG","AB","SAHARA","CHEEMS","BANANAS31","RIVER","MYX","FORM",
+    "LAB","HTX","UB","DUCKY","WFI","KOGE","ALE","GOMINING","0G","BEAM",
+    "MY","SOON","AIOZ","ZIG","TAC","HUMA","ZIL","VELO","BRETT","OPEN",
+    "BSB","TOSHI","BAS","ACH","KAVA","IRYS","DUSK","SUSHI","PEAQ","COAI",
+    "BDCA","BNB","Q","FF","B","BabyDoge",
 ]
 
 # Stablecoins y tokens de precio fijo — excluir del escaner de volumen

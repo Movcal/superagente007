@@ -133,11 +133,12 @@ def fetch_token_info(symbol):
     return {}
 
 
-def score_price_sentiment(price_data, symbol, trending_list):
+def score_price_sentiment(price_data, symbol, trending_list, volume_ratio=1.0):
     """
     Calcula score de sentimiento basado en:
     - Cambio de precio 1h y 24h
     - Si el token esta en trending
+    - Spike de volumen (señal anticipada — el volumen precede al precio)
     Retorna: score (-1.0 a 1.0), razon
     """
     if not price_data:
@@ -191,14 +192,26 @@ def score_price_sentiment(price_data, symbol, trending_list):
         score += 0.15
         reasons.append("en trending CMC ahora mismo")
 
+    # Bonus por spike de volumen (el volumen precede al precio — señal anticipada)
+    if volume_ratio >= 20:
+        score += 0.35
+        reasons.append(f"volumen {volume_ratio:.0f}x (spike extremo)")
+    elif volume_ratio >= 10:
+        score += 0.25
+        reasons.append(f"volumen {volume_ratio:.0f}x (spike alto)")
+    elif volume_ratio >= 5:
+        score += 0.15
+        reasons.append(f"volumen {volume_ratio:.1f}x (spike detectado)")
+
     reason = " | ".join(reasons) if reasons else "Movimiento de precio neutral"
     return round(max(-1.0, min(1.0, score)), 2), reason
 
 
-def analyze(symbol):
+def analyze(symbol, volume_ratio=1.0):
     """
     Analisis completo de sentimiento para un token.
     Retorna dict con: sentiment (POSITIVO/NEGATIVO/NEUTRO), score, razon, datos de contexto.
+    volume_ratio: ratio de volumen detectado (el volumen precede al precio, es señal anticipada).
     """
     log(f"Analizando sentimiento de {symbol}...")
 
@@ -209,8 +222,8 @@ def analyze(symbol):
     trending_list = fetch_trending()
     in_trending = symbol in trending_list
 
-    # 3. Score de precio
-    price_score, price_reason = score_price_sentiment(price_data, symbol, trending_list)
+    # 3. Score de precio + volumen
+    price_score, price_reason = score_price_sentiment(price_data, symbol, trending_list, volume_ratio)
 
     # 4. Fear & Greed del mercado general
     fg = fetch_fear_greed()

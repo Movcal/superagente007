@@ -12,8 +12,8 @@ CMC_API_KEY = os.getenv("CMC_API_KEY")
 CONTRACTS_FILE = "data/token_contracts.json"
 
 # Contratos BSC verificados contra PancakeSwap (fuente primaria) y CMC
-# Actualizados: 2026-06-15 | Cubiertos: 136/149 tokens de la competencia
-# Pendientes sin contrato BSC confirmado: TON, WLFI, LAB, HTX, CTM, DUCKY, BEAM, REAL, BRETT, APR
+# Actualizados: 2026-06-16 | Cubiertos: 137/149 tokens de la competencia
+# Pendientes sin contrato BSC confirmado: TON, WLFI, LAB, HTX, CTM, BEAM, REAL, BRETT, APR
 KNOWN_CONTRACTS = {
     # ── Wrappers / nativos ────────────────────────────────────────────────────
     "BNB":       "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
@@ -173,7 +173,7 @@ KNOWN_CONTRACTS = {
     "GOMINING":  "0x7Ddc52c4De30e94Be3A6A0A2b259b2850f421989",
 
     # ── Verificados manualmente ───────────────────────────────────────────────
-    # Pendientes: WLFI, LAB, HTX, CTM, DUCKY, BEAM, REAL, BRETT, APR
+    # Pendientes: WLFI, LAB, HTX, CTM, BEAM, REAL, BRETT, APR
     "TON":       "0x76a797a59ba2c17726896976b7b3747bfd1d220f",
     "WLFI":      "0x47474747477b199288bF72a1D702f7Fe0Fb1DEeA",
     "BRETT":     "0xa7440029eca41deabd8775ef1d6086b37d4df8d6",

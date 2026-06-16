@@ -9,6 +9,7 @@ from modules.volume_monitor import run_once as check_volumes
 from modules.decision_engine import evaluate as evaluate_decision
 from modules.trade_executor import buy
 from modules.position_watcher import run_once as check_positions
+from modules.reconcile import reconcile
 
 LOOP_INTERVAL_SEC = 300  # 5 minutos
 
@@ -55,6 +56,9 @@ def main():
     log("SUPERAGENTE007 INICIADO")
     log(f"Intervalo de ciclo: {LOOP_INTERVAL_SEC // 60} minutos")
     log("=" * 60)
+
+    # Reconcile de estado al arranque: verifica posiciones abiertas contra la wallet real
+    reconcile()
 
     cycle = 0
     while True:

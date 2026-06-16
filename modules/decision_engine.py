@@ -161,8 +161,8 @@ def evaluate(volume_alert, path="B"):
         log(f"Maximo de posiciones alcanzado ({MAX_POSICIONES}), ignorando {symbol}")
         return None
 
-    # Analizar sentimiento
-    sentiment = analyze_sentiment(symbol)
+    # Analizar sentimiento (se pasa volume_ratio para que el spike sea señal anticipada)
+    sentiment = analyze_sentiment(symbol, volume_ratio=volume_ratio)
 
     # REGLA PRINCIPAL: doble confirmacion obligatoria
     # Volumen confirmado (ya lo tenemos por la alerta)

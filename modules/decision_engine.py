@@ -6,6 +6,7 @@ import sys, pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 from modules.sentiment_analyzer import analyze as analyze_sentiment
 from modules.news_analyzer import get_market_bias
+from modules.market_intelligence import get_narrative_boost, get_narrative_confirmation
 
 load_dotenv()
 
@@ -43,7 +44,7 @@ def get_available_capital():
     return max(0, CAPITAL_TOTAL - capital_usado)
 
 
-def calculate_position_size(volume_ratio, sentiment_score, is_priority):
+def calculate_position_size(volume_ratio, sentiment_score, is_priority, symbol=""):
     """
     El agente decide cuanto capital usar segun la calidad de la oportunidad.
     - Oportunidad fuerte: hasta CAPITAL_POR_POSICION
@@ -61,6 +62,15 @@ def calculate_position_size(volume_ratio, sentiment_score, is_priority):
 
     if is_priority:
         opportunity_score = min(1.0, opportunity_score + 0.1)
+
+    # Boost por narrativa acumulada (market intelligence)
+    if symbol:
+        try:
+            narrative_boost = get_narrative_boost(symbol)
+            if narrative_boost > 0:
+                opportunity_score = min(1.0, opportunity_score + narrative_boost)
+        except Exception:
+            pass  # no bloquear la decision si market_intelligence falla
 
     # Tamano de posicion
     if opportunity_score >= 0.7:
@@ -97,15 +107,13 @@ def estimate_hold_time(volume_ratio, sentiment_score, narrative):
     return hours_min, hours_max, reason
 
 
-def generate_reasoning(symbol, volume_alert, sentiment_result, capital, hold_min, hold_max, hold_reason):
+def generate_reasoning(symbol, volume_alert, sentiment_result, capital, hold_min, hold_max, hold_reason, narrative_conf=None):
     """Genera el texto de razonamiento del agente."""
     pd = sentiment_result.get("price_data", {}) or {}
     change_1h = pd.get("change_1h", 0)
     change_24h = pd.get("change_24h", 0)
     price = pd.get("price", 0)
     in_trending = sentiment_result.get("in_trending", False)
-    fg = sentiment_result.get("fear_greed", "Neutral")
-    fg_val = sentiment_result.get("fear_greed_value", 50)
     narrative = sentiment_result.get("narrative", "general")
     is_priority = sentiment_result.get("is_priority", False)
 
@@ -116,13 +124,26 @@ def generate_reasoning(symbol, volume_alert, sentiment_result, capital, hold_min
         f"  Volumen: {volume_alert['ratio']}x su promedio (threshold: 5x) — confirmado",
         f"  Sentimiento: {sentiment_result['sentiment']} (score: {sentiment_result['score']})",
         f"  Precio actual: ${price:.4f} | 1h: {change_1h:+.2f}% | 24h: {change_24h:+.2f}%",
-        f"  Fear & Greed: {fg} ({fg_val}/100)",
         f"  Narrativa: {narrative}",
         f"  En trending CMC: {'Si' if in_trending else 'No'}",
     ]
 
     if is_priority:
         lines.append(f"  Token prioritario del ecosistema BNB: Si")
+
+    # Confirmacion narrativa pre-spike
+    if narrative_conf:
+        strength = narrative_conf.get("strength", "ninguna")
+        confirmed = narrative_conf.get("confirmed", False)
+        bull_score = narrative_conf.get("bull_score", 0)
+        pos_days = narrative_conf.get("positive_days", 0)
+        if confirmed:
+            lines.append(f"")
+            lines.append(f"DOBLE CONFIRMACION NARRATIVA + VOLUMEN:")
+            lines.append(f"  {narrative_conf['message']}")
+        else:
+            lines.append(f"")
+            lines.append(f"ADVERTENCIA NARRATIVA: {narrative_conf['message']}")
 
     lines += [
         f"",
@@ -171,6 +192,15 @@ def evaluate(volume_alert, path="B"):
         log(f"{symbol} rechazado: sentimiento {sentiment['sentiment']}, se necesita POSITIVO")
         return None
 
+    # Confirmacion narrativa pre-spike: el volumen confirma lo que las noticias ya anunciaban
+    narrative_conf = get_narrative_confirmation(symbol)
+    if narrative_conf["confirmed"]:
+        log(f"{symbol} DOBLE CONFIRMACION: volumen {volume_ratio}x + narrativa {narrative_conf['strength'].upper()} "
+            f"({narrative_conf['bull_score']}% bullish, {narrative_conf['positive_days']} dias)")
+    else:
+        log(f"{symbol} narrativa: {narrative_conf['strength']} ({narrative_conf['bull_score']}% bullish) — "
+            f"spike sin respaldo previo de noticias")
+
     # Analisis de noticias y KOLs via Claude
     # Si CLAUDE_ENABLED=false -> market_bias=None y este bloque no hace nada
     market_bias = get_market_bias(symbol)
@@ -183,7 +213,7 @@ def evaluate(volume_alert, path="B"):
             # Se aplica el 50% de reduccion despues de calculate_position_size
 
     # Calcular capital
-    capital = calculate_position_size(volume_ratio, sentiment["score"], sentiment["is_priority"])
+    capital = calculate_position_size(volume_ratio, sentiment["score"], sentiment["is_priority"], symbol)
     if capital <= 0:
         log(f"{symbol} rechazado: sin capital disponible")
         return None
@@ -200,7 +230,8 @@ def evaluate(volume_alert, path="B"):
 
     # Generar razonamiento
     reasoning = generate_reasoning(
-        symbol, volume_alert, sentiment, capital, hold_min, hold_max, hold_reason
+        symbol, volume_alert, sentiment, capital, hold_min, hold_max, hold_reason,
+        narrative_conf=narrative_conf
     )
 
     decision = {

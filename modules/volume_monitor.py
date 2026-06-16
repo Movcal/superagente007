@@ -23,9 +23,9 @@ TOKENS = [
     "FIL","INJ","FET","BONK","PENGU","CAKE","SIREN","LUNC","ZRO","BTT",
     "FLOKI","PENDLE","AXS","TWT","HOME","COMP","XCN","GENIUS","XPL","SKYAI",
     "APE","SFP","TAG","AB","SAHARA","CHEEMS","BANANAS31","RIVER","MYX","FORM",
-    "LAB","HTX","UB","DUCKY","WFI","KOGE","ALE","GOMINING","0G","BEAM",
+    "LAB","HTX","UB","DUCKY","WFI","KOGE","GOMINING","0G","BEAM",
     "MY","SOON","AIOZ","ZIG","TAC","HUMA","ZIL","VELO","BRETT","OPEN",
-    "BSB","TOSHI","BAS","ACH","KAVA","IRYS","DUSK","SUSHI","PEAQ","COAI",
+    "BSB","TOSHI","BAS","KAVA","IRYS","DUSK","SUSHI","PEAQ","COAI",
     "BDCA","BNB","Q","FF","B","BabyDoge",
 ]
 

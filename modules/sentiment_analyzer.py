@@ -225,29 +225,13 @@ def analyze(symbol, volume_ratio=1.0):
     # 3. Score de precio + volumen
     price_score, price_reason = score_price_sentiment(price_data, symbol, trending_list, volume_ratio)
 
-    # 4. Fear & Greed del mercado general
-    fg = fetch_fear_greed()
-    fg_value = fg["value"]
-    fg_class = fg["classification"]
-
-    # El Fear & Greed afecta el score general
-    market_modifier = 0.0
-    if fg_value >= 75:    # Extreme Greed
-        market_modifier = 0.1
-    elif fg_value >= 55:  # Greed
-        market_modifier = 0.05
-    elif fg_value <= 25:  # Extreme Fear
-        market_modifier = -0.2
-    elif fg_value <= 45:  # Fear
-        market_modifier = -0.1
-
-    # 5. Info del token
+    # 4. Info del token
     token_info = fetch_token_info(symbol)
     narrative = get_token_narrative(symbol)
     is_priority = symbol in PRIORITY_TOKENS
 
-    # Score final
-    final_score = round(max(-1.0, min(1.0, price_score + market_modifier)), 2)
+    # Score final — solo precio, volumen y trending (sin modificador macro F&G)
+    final_score = round(max(-1.0, min(1.0, price_score)), 2)
 
     # Clasificacion
     if final_score >= 0.2:
@@ -264,8 +248,6 @@ def analyze(symbol, volume_ratio=1.0):
         "price_score": price_score,
         "price_reason": price_reason,
         "in_trending": in_trending,
-        "fear_greed": fg_class,
-        "fear_greed_value": fg_value,
         "narrative": narrative,
         "is_priority": is_priority,
         "token_name": token_info.get("name", symbol),
@@ -274,7 +256,7 @@ def analyze(symbol, volume_ratio=1.0):
         "timestamp": datetime.utcnow().isoformat()
     }
 
-    log(f"{symbol} -> {sentiment} (score: {final_score}) | F&G: {fg_class} ({fg_value}) | {price_reason}")
+    log(f"{symbol} -> {sentiment} (score: {final_score}) | {price_reason}")
     return result
 
 

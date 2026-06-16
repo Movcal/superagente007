@@ -150,8 +150,8 @@ def fetch_narratives_from_mcp():
             change_7d  = row[6] if len(row) > 6 else ""
             keywords   = row[15] if len(row) > 15 else []
             top_coins  = []
-            if len(row) > 17 and isinstance(row[17], dict):
-                coin_rows = row[17].get("rows", [])
+            if len(row) > 15 and isinstance(row[15], dict):
+                coin_rows = row[15].get("rows", [])
                 top_coins = [c[0] for c in coin_rows[:3] if c]
 
             narratives.append({

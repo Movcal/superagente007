@@ -708,45 +708,68 @@ def save_watchlist(watchlist):
         json.dump(watchlist, f, indent=2, ensure_ascii=False)
 
 
+def load_trending_categories():
+    """Lee las categorias trending_up del resumen diario mas reciente."""
+    try:
+        files = sorted(pathlib.Path(SUMMARIES_DIR).glob("*.json"), reverse=True)
+        if files:
+            data = json.loads(files[0].read_text(encoding="utf-8"))
+            cats = set(data.get("trending_up", []))
+            if cats:
+                log(f"[WATCHLIST] Narrativas trending hoy: {', '.join(cats)}")
+            return cats
+    except Exception:
+        pass
+    return set()
+
+
 def update_watchlist():
     """
     Recorre todos los tokens y actualiza la watchlist:
     - Agrega los que tienen narrativa confirmada (moderada o fuerte)
-    - Remueve los que perdieron narrativa (strength == ninguna y bull_score < 25)
+    - Agrega con prioridad TODOS los tokens cuya categoria esta en trending_up del resumen diario
+      (umbral reducido a 20% bull_score si la narrativa es trending)
+    - Remueve los que perdieron narrativa y no estan en trending
     - Actualiza el estado de los que ya estaban
-
-    Retorna: dict con {symbol: entry} de los tokens en watchlist.
     """
-    knowledge = load_token_knowledge()
-    tracker   = load_tracker()
-    watchlist = load_watchlist()
-    today     = datetime.utcnow().strftime("%Y-%m-%d")
+    knowledge     = load_token_knowledge()
+    tracker       = load_tracker()
+    watchlist     = load_watchlist()
+    trending_cats = load_trending_categories()
+    today         = datetime.utcnow().strftime("%Y-%m-%d")
     added = removed = updated = 0
 
     for symbol in knowledge:
-        conf = get_narrative_confirmation(symbol, knowledge, tracker)
+        conf     = get_narrative_confirmation(symbol, knowledge, tracker)
+        cat      = knowledge[symbol].get("category", "")
+        in_trend = cat in trending_cats
 
-        if conf["confirmed"]:
+        # Umbral: 40% normal, 20% si la narrativa esta trending en el resumen diario
+        threshold = 20 if in_trend else 40
+        qualifies = conf["confirmed"] or (in_trend and conf["bull_score"] >= threshold)
+
+        if qualifies:
+            entry = {
+                "narrative_strength":  conf["strength"],
+                "bull_score":          conf["bull_score"],
+                "positive_days":       conf["positive_days"],
+                "last_updated":        datetime.utcnow().isoformat(),
+                "trending_narrative":  in_trend,
+                "category":            cat,
+            }
             if symbol not in watchlist:
-                watchlist[symbol] = {
-                    "added":              today,
-                    "narrative_strength": conf["strength"],
-                    "bull_score":         conf["bull_score"],
-                    "positive_days":      conf["positive_days"],
-                    "last_updated":       datetime.utcnow().isoformat(),
-                    "volume_status":      "waiting"   # waiting | building | accelerating
-                }
+                entry["added"]         = today
+                entry["volume_status"] = "waiting"
+                watchlist[symbol]      = entry
                 added += 1
-                log(f"[WATCHLIST] + {symbol} agregado ({conf['strength']}, {conf['bull_score']}% bullish)")
+                if in_trend and not conf["confirmed"]:
+                    log(f"[WATCHLIST] + {symbol} agregado (narrativa {cat} TRENDING, {conf['bull_score']}% bullish)")
+                else:
+                    log(f"[WATCHLIST] + {symbol} agregado ({conf['strength']}, {conf['bull_score']}% bullish)")
             else:
-                watchlist[symbol].update({
-                    "narrative_strength": conf["strength"],
-                    "bull_score":         conf["bull_score"],
-                    "positive_days":      conf["positive_days"],
-                    "last_updated":       datetime.utcnow().isoformat(),
-                })
+                watchlist[symbol].update(entry)
                 updated += 1
-        elif symbol in watchlist and conf["bull_score"] < 25:
+        elif symbol in watchlist and conf["bull_score"] < 25 and not in_trend:
             del watchlist[symbol]
             removed += 1
             log(f"[WATCHLIST] - {symbol} removido (narrativa caida: {conf['bull_score']}% bullish)")

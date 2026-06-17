@@ -259,12 +259,23 @@ def _call_claude(symbol, context):
     rules = load_market_rules()
     ctx_text = json.dumps(context, indent=2, ensure_ascii=False, default=str)
 
+    ta_section = ""
+    if context.get("ta_analysis"):
+        in_wl = context.get("in_watchlist", False)
+        wl_label = "CON narrativa previa acumulada en watchlist" if in_wl else "SIN narrativa previa (spike inesperado — investigar causa)"
+        ta_section = f"""
+## ANALISIS TECNICO DEL TOKEN ({wl_label})
+{context["ta_analysis"]}
+- Si ta_rating=avoid pero las noticias detectan suelo, podes PROCEED con REDUCE_SIZE
+- Si el token NO tiene narrativa previa, investigar si el spike es panico, euforia o narrativa emergente
+"""
+
     prompt = f"""Sos un analista de trading cripto especializado en BSC/BNB Chain.
 Analizá el contexto actual y decidí si es momento de comprar {symbol}.
 
 ## REGLAS DEL OPERADOR (seguirlas siempre)
 {rules}
-
+{ta_section}
 ## CONTEXTO DE MERCADO AHORA
 {ctx_text}
 
@@ -337,9 +348,13 @@ def _log_cost(input_tokens, output_tokens, cost_usd):
 
 # ── Funcion publica ───────────────────────────────────────────────────────────
 
-def get_market_bias(symbol):
+def get_market_bias(symbol, extra_context=None):
     """
     Funcion principal que llama el decision_engine.
+
+    extra_context: dict opcional con:
+      - ta_analysis : resumen RSI + MACD + Momentum del token
+      - in_watchlist: True si el token tiene narrativa previa acumulada
 
     Retorna:
       - None si CLAUDE_ENABLED=false (no afecta la decision)
@@ -349,6 +364,9 @@ def get_market_bias(symbol):
     log(f"Analizando contexto para {symbol}...")
 
     context = build_context(symbol)
+    if extra_context:
+        context["ta_analysis"]  = extra_context.get("ta_analysis", "")
+        context["in_watchlist"] = extra_context.get("in_watchlist", False)
     analysis = _call_claude(symbol, context)
 
     if not analysis:

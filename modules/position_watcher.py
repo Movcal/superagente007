@@ -16,8 +16,9 @@ WATCHER_LOG    = "logs/position_watcher.log"
 COMPLIANCE_FILE = "data/compliance_trades.json"
 
 # Umbrales de salida
-TAKE_PROFIT_PCT   = 15.0   # salir si sube 15%
-STOP_LOSS_PCT     = -8.0   # salir si baja 8%
+STOP_LOSS_PCT      = -8.0  # stop loss fijo (antes de que se active el trailing)
+TRAILING_STOP_PCT  = 0.02  # trailing stop: 2% bajo el maximo alcanzado
+TRAILING_ACTIVATION = 0.02 # se activa cuando precio sube 2% desde entrada
 BTC_DROP_ALERT_PCT = -3.0  # salir de alts si BTC cae 3%
 
 # Palabras clave de noticias negativas que fuerzan salida inmediata
@@ -104,17 +105,19 @@ def check_mcp_exit_signals(symbol):
                     if kw in combined:
                         return True, f"noticia negativa detectada: '{kw}' en '{row[0][:60]}'"
 
-        # 2. RSI y MACD
+        # 2. Agotamiento — requiere los 3 juntos: RSI>70 + MACD negativo + volumen normalizado
         ta = _mcp_call(session, "get_crypto_technical_analysis", {"id": cmc_id})
         if ta:
-            rsi14 = float(ta.get("rsi", {}).get("rsi14", 50))
+            rsi14     = float(ta.get("rsi", {}).get("rsi14", 50))
             macd_hist = float(ta.get("macd", {}).get("histogram", 0))
 
-            if rsi14 > 75:
-                return True, f"RSI14 sobrecomprado ({rsi14:.1f}) — momentum agotándose"
+            rsi_exhausted  = rsi14 > 70
+            macd_bearish   = macd_hist < 0
+            vol_normalized = _check_volume_normalized(symbol)
 
-            if rsi14 > 70 and macd_hist < 0:
-                return True, f"RSI alto ({rsi14:.1f}) + MACD histogram negativo ({macd_hist:.6f}) — señal de reversión"
+            if rsi_exhausted and macd_bearish and vol_normalized:
+                return True, (f"Agotamiento confirmado: RSI {rsi14:.1f} (>70) + "
+                              f"MACD hist {macd_hist:.6f} (<0) + volumen normalizado")
 
         # 3. Narrativa perdiendo fuerza
         narratives = _mcp_call(session, "trending_crypto_narratives")
@@ -141,6 +144,29 @@ def check_mcp_exit_signals(symbol):
     except Exception as e:
         log(f"Error en check_mcp_exit_signals({symbol}): {e}")
         return False, None
+
+
+def _check_volume_normalized(symbol):
+    """
+    Verifica si el volumen del token volvió al promedio histórico.
+    Retorna True si las últimas 3 lecturas están por debajo del promedio de las anteriores.
+    """
+    history_file = "data/volume_history.json"
+    if not os.path.exists(history_file):
+        return False
+    try:
+        with open(history_file, "r") as f:
+            history = json.load(f)
+        readings = history.get(symbol, [])
+        if len(readings) < 9:
+            return False
+        baseline = sum(readings[-9:-3]) / 6   # promedio de lecturas 4-9 atras
+        recent   = sum(readings[-3:]) / 3     # promedio ultimas 3 lecturas
+        if baseline == 0:
+            return False
+        return (recent / baseline) < 1.5      # volumen normalizado si cayo bajo 1.5x
+    except Exception:
+        return False
 
 
 def log(msg):
@@ -224,37 +250,47 @@ def get_entry_price(position):
 def check_exit_conditions(position, current_price, btc_change):
     """
     Evalua si se debe salir de una posicion.
-    Retorna: (debe_salir, razon) o (False, None)
+    Retorna: (debe_salir, razon, posicion_actualizada)
+
+    Salidas en orden de prioridad:
+      1. BTC cae mas del 3% (macro)
+      2. Trailing stop 2% (activo cuando precio sube 2% desde entrada)
+      3. Stop loss -8% (antes de que el trailing se active)
+    Sin tiempo maximo — la posicion dura mientras no se activen las salidas.
     """
     symbol = position["symbol"]
-    entry_time = datetime.fromisoformat(position["entry_time"])
-    hold_max_hours = position.get("hold_max_hours", 12)
-    hours_open = (datetime.utcnow() - entry_time.replace(tzinfo=None)).total_seconds() / 3600
+
+    # 1. BTC cayo mas del 3% (macro negativa)
+    if btc_change <= BTC_DROP_ALERT_PCT:
+        return True, f"BTC cayo {btc_change:.2f}% (proteccion macro)", position
 
     entry_price = get_entry_price(position)
+    if not entry_price or not current_price:
+        return False, None, position
 
-    # 1. Tiempo maximo excedido
-    if hours_open >= hold_max_hours:
-        return True, f"tiempo maximo alcanzado ({hold_max_hours}h)"
+    pct_change = ((current_price - entry_price) / entry_price) * 100
 
-    # 2. BTC cayo mas del 3% (macro negativa)
-    if btc_change <= BTC_DROP_ALERT_PCT:
-        return True, f"BTC cayo {btc_change:.2f}% (proteccion macro)"
+    # Actualizar highest_price
+    highest_price = max(position.get("highest_price", entry_price), current_price)
+    position["highest_price"] = highest_price
 
-    if entry_price and current_price:
-        pct_change = ((current_price - entry_price) / entry_price) * 100
-
-        # 3. Take profit
-        if pct_change >= TAKE_PROFIT_PCT:
-            return True, f"take profit: +{pct_change:.2f}%"
-
-        # 4. Stop loss
+    # 2. Trailing stop (se activa cuando precio sube TRAILING_ACTIVATION desde entrada)
+    if highest_price >= entry_price * (1 + TRAILING_ACTIVATION):
+        trailing_stop = highest_price * (1 - TRAILING_STOP_PCT)
+        if current_price <= trailing_stop:
+            return True, (f"trailing stop: precio ${current_price:.4f} bajo "
+                          f"${trailing_stop:.4f} (2% bajo maximo ${highest_price:.4f}, "
+                          f"ganancia neta: {pct_change:+.2f}%)"), position
+        log(f"{symbol}: ${current_price:.4f} | max ${highest_price:.4f} | "
+            f"trailing stop ${trailing_stop:.4f} | {pct_change:+.2f}%")
+    else:
+        # 3. Stop loss fijo mientras trailing no esta activo
         if pct_change <= STOP_LOSS_PCT:
-            return True, f"stop loss: {pct_change:.2f}%"
+            return True, f"stop loss: {pct_change:.2f}%", position
+        log(f"{symbol}: ${current_price:.4f} | entrada ${entry_price:.4f} | "
+            f"{pct_change:+.2f}% (trailing aun no activo)")
 
-        log(f"{symbol}: precio ${current_price:.4f} | entrada ~${entry_price:.4f} | cambio: {pct_change:+.2f}%")
-
-    return False, None
+    return False, None, position
 
 
 def needs_compliance_trade():
@@ -317,7 +353,7 @@ def check_all_positions():
             log(f"{symbol}: no se pudo obtener precio, saltando")
             continue
 
-        should_exit, reason = check_exit_conditions(position, current_price, btc_change)
+        should_exit, reason, position = check_exit_conditions(position, current_price, btc_change)
 
         # Si las condiciones basicas no disparan salida, verificar señales MCP
         if not should_exit:
@@ -330,6 +366,14 @@ def check_all_positions():
             success = sell(position, reason=reason)
             if success:
                 closed.append(symbol)
+        else:
+            # Guardar highest_price actualizado aunque no haya salida
+            all_positions = load_positions()
+            for i, p in enumerate(all_positions):
+                if p["symbol"] == symbol and p.get("status") == "OPEN":
+                    all_positions[i]["highest_price"] = position.get("highest_price", current_price)
+                    break
+            save_positions(all_positions)
 
     return closed
 

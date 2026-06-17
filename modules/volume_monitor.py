@@ -108,9 +108,28 @@ def log(msg):
         f.write(line + "\n")
 
 
+def load_watchlist_thresholds():
+    """Lee watchlist.json y retorna {symbol: threshold} con 2x o 3x."""
+    watchlist_file = "data/watchlist.json"
+    thresholds = {}
+    if not os.path.exists(watchlist_file):
+        return thresholds
+    try:
+        with open(watchlist_file, "r") as f:
+            watchlist = json.load(f)
+        for symbol, entry in watchlist.items():
+            days = entry.get("days_in_watchlist", 0)
+            thresholds[symbol] = 2.0 if days >= 3 else 3.0
+    except Exception:
+        pass
+    return thresholds
+
+
 def check_volume_spikes(current_volumes, history):
     """Compara volumen actual con promedio historico. Devuelve alertas."""
+    watchlist_thresholds = load_watchlist_thresholds()
     alerts = []
+
     for symbol, current_vol in current_volumes.items():
         if current_vol == 0:
             continue
@@ -130,14 +149,19 @@ def check_volume_spikes(current_volumes, history):
         ratio = current_vol / avg_vol
         is_priority = symbol in PRIORITY_TOKENS
 
-        if ratio >= VOLUMEN_THRESHOLD:
+        # Threshold dinamico: 2x (watchlist 3+ dias), 3x (watchlist), 5x (sin narrativa)
+        threshold = watchlist_thresholds.get(symbol, VOLUMEN_THRESHOLD)
+
+        if ratio >= threshold:
             alert = {
-                "symbol": symbol,
-                "ratio": round(ratio, 2),
+                "symbol":         symbol,
+                "ratio":          round(ratio, 2),
                 "current_volume": current_vol,
-                "avg_volume": avg_vol,
-                "timestamp": datetime.utcnow().isoformat(),
-                "priority": is_priority
+                "avg_volume":     avg_vol,
+                "timestamp":      datetime.utcnow().isoformat(),
+                "priority":       is_priority,
+                "threshold_used": threshold,
+                "in_watchlist":   symbol in watchlist_thresholds,
             }
             alerts.append(alert)
             save_alert(alert)

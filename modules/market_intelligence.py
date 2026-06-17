@@ -519,7 +519,7 @@ def scan_news(symbols=None):
 
     if not knowledge:
         log("Sin token knowledge disponible, abortando scan")
-        return {}
+        return {}, {}
 
     target_symbols = symbols if symbols else list(knowledge.keys())
     client = CMCClient()
@@ -762,6 +762,13 @@ def update_watchlist():
         qualifies = conf["confirmed"] or (in_trend and conf["bull_score"] >= threshold)
 
         if qualifies:
+            added_date = watchlist[symbol].get("added", today) if symbol in watchlist else today
+            try:
+                days_in_watchlist = (datetime.utcnow().date() -
+                                     datetime.strptime(added_date, "%Y-%m-%d").date()).days
+            except Exception:
+                days_in_watchlist = 0
+
             entry = {
                 "narrative_strength":  conf["strength"],
                 "bull_score":          conf["bull_score"],
@@ -769,10 +776,12 @@ def update_watchlist():
                 "last_updated":        datetime.utcnow().isoformat(),
                 "trending_narrative":  in_trend,
                 "category":            cat,
+                "days_in_watchlist":   days_in_watchlist,
             }
             if symbol not in watchlist:
                 entry["added"]         = today
                 entry["volume_status"] = "waiting"
+                entry["days_in_watchlist"] = 0
                 watchlist[symbol]      = entry
                 added += 1
                 if in_trend and not conf["confirmed"]:

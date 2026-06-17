@@ -14,6 +14,7 @@ from modules.market_intelligence import (
     scan_news, generate_daily_summary, should_generate_summary,
     update_watchlist, check_watchlist_volume
 )
+from modules.technical_screener import screen_watchlist
 
 LOOP_INTERVAL_SEC = 300  # 5 minutos
 NEWS_SCAN_EVERY_N_CYCLES = 6  # escanea noticias cada ~30 min (6 x 5 min)
@@ -115,6 +116,8 @@ def main():
             try:
                 _, breaking_news = scan_news()
                 update_watchlist()
+                log("--- Analizando TA de watchlist ---")
+                screen_watchlist()
 
                 # BREAKING NEWS: BULLISH_ALTO — evaluar entrada inmediata sin esperar ciclo
                 if breaking_news:

@@ -7,6 +7,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 from modules.sentiment_analyzer import analyze as analyze_sentiment
 from modules.news_analyzer import get_market_bias
 from modules.market_intelligence import get_narrative_boost, get_narrative_confirmation
+from modules.technical_screener import get_token_ta
 
 load_dotenv()
 
@@ -195,6 +196,23 @@ def evaluate(volume_alert, path="B"):
     if is_breaking and sentiment["sentiment"] != "POSITIVO":
         log(f"{symbol} [BREAKING] override de sentimiento: noticia alto impacto, entrando aunque precio aun no confirma")
 
+    # Verificar si el token esta en watchlist y tiene TA precalculado
+    token_ta = get_token_ta(symbol)
+    in_watchlist = token_ta is not None
+
+    if in_watchlist:
+        ta_rating = token_ta.get("ta_rating", "wait")
+        ta_summary = token_ta.get("ta_summary", "")
+        days_in_watchlist = token_ta.get("days_in_watchlist", 0)
+        log(f"{symbol} en watchlist ({days_in_watchlist} dias) | TA: {ta_rating} | {ta_summary}")
+        # Si el TA dice avoid, Claude igual decide (puede detectar suelo)
+        if ta_rating == "avoid":
+            log(f"{symbol} TA=avoid — Claude evaluara con contexto completo si hay oportunidad")
+    else:
+        # Token sin narrativa: Claude investiga la causa del spike
+        ta_summary = "Token sin narrativa previa — spike sin respaldo de noticias acumuladas"
+        log(f"{symbol} no esta en watchlist — Claude investigara causa del spike {volume_ratio}x")
+
     # Confirmacion narrativa pre-spike: el volumen confirma lo que las noticias ya anunciaban
     narrative_conf = get_narrative_confirmation(symbol)
     if narrative_conf["confirmed"]:
@@ -204,9 +222,9 @@ def evaluate(volume_alert, path="B"):
         log(f"{symbol} narrativa: {narrative_conf['strength']} ({narrative_conf['bull_score']}% bullish) — "
             f"spike sin respaldo previo de noticias")
 
-    # Analisis de noticias y KOLs via Claude
+    # Analisis de noticias y KOLs via Claude (recibe TA + contexto watchlist)
     # Si CLAUDE_ENABLED=false -> market_bias=None y este bloque no hace nada
-    market_bias = get_market_bias(symbol)
+    market_bias = get_market_bias(symbol, extra_context={"ta_analysis": ta_summary, "in_watchlist": in_watchlist})
     if market_bias:
         if market_bias["action_modifier"] == "SKIP":
             log(f"{symbol} rechazado por Claude: {market_bias['reason']}")

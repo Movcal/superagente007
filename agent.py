@@ -113,8 +113,31 @@ def main():
         if cycle % NEWS_SCAN_EVERY_N_CYCLES == 0:
             log("--- Escaneando noticias CMC ---")
             try:
-                scan_news()
+                _, breaking_news = scan_news()
                 update_watchlist()
+
+                # BREAKING NEWS: BULLISH_ALTO — evaluar entrada inmediata sin esperar ciclo
+                if breaking_news:
+                    log(f"[BREAKING] {len(breaking_news)} tokens con noticia de alto impacto — evaluando entrada inmediata")
+                    for sym, titulo in breaking_news.items():
+                        log(f"[BREAKING] Evaluando {sym}: '{titulo[:80]}'")
+                        breaking_alert = {
+                            "symbol":         sym,
+                            "ratio":          1.0,  # volumen aun no confirmado
+                            "current_volume": 0,
+                            "avg_volume":     0,
+                            "timestamp":      datetime.utcnow().isoformat(),
+                            "priority":       True,
+                            "breaking_news":  True,
+                        }
+                        decision = evaluate_decision(breaking_alert, path="A")
+                        if decision:
+                            log(f"[BREAKING] Decision: COMPRAR {sym} con ${decision['capital']}")
+                            position = buy(decision)
+                            if position:
+                                log(f"[BREAKING] Posicion abierta via breaking news en {sym}")
+                            else:
+                                log(f"[BREAKING] Fallo al abrir posicion breaking en {sym}")
             except Exception as e:
                 log(f"Error en scan/watchlist: {e}")
 

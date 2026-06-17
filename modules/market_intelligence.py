@@ -214,7 +214,7 @@ def update_narrative_tracker(tracker, matched_with_sentiment, knowledge):
         tracker[today] = {"categories": {}, "tokens": {}}
 
     for symbol, sentiment in matched_with_sentiment:
-        key = "positive" if sentiment == "BULLISH" else ("negative" if sentiment == "BEARISH" else "neutral")
+        key = "positive" if sentiment in ("BULLISH_ALTO", "BULLISH_BAJO") else ("negative" if sentiment == "BEARISH" else "neutral")
 
         # Token
         tokens_day = tracker[today]["tokens"]
@@ -375,14 +375,18 @@ def classify_sentiment_batch(articles):
 
     prompt = (
         "You are a crypto market sentiment classifier.\n"
-        "Classify each article as BULLISH, BEARISH, or NEUTRAL for the token in brackets.\n\n"
-        "Rules:\n"
-        "- BULLISH: positive news for the token (partnership, launch, adoption, price surge, bullish analysis, upgrade)\n"
-        "- BEARISH: negative news (hack, exploit, shutdown, lawsuit, price crash, token unlock pressure, bearish analysis)\n"
-        "- NEUTRAL: general market news, unrelated content, pure price prediction with no clear bias\n\n"
-        "Important: classify based on impact on THAT specific token, not the general market.\n\n"
+        "Classify each article using EXACTLY one of: BULLISH_ALTO, BULLISH_BAJO, BEARISH, NEUTRAL\n\n"
+        "Definitions:\n"
+        "- BULLISH_ALTO: major catalyst — institutional/government adoption, listing on Binance/Coinbase/Kraken, "
+        "partnership with Fortune 500 or top-tier blockchain, integration as payment method at scale, "
+        "major protocol upgrade (mainnet launch, v2), regulatory approval\n"
+        "- BULLISH_BAJO: minor positive — generic price analysis, small partnership, community sentiment, "
+        "minor exchange listing, ecosystem grant, bullish prediction without concrete catalyst\n"
+        "- BEARISH: negative news (hack, exploit, shutdown, lawsuit, price crash, token unlock, bearish analysis)\n"
+        "- NEUTRAL: general market news, unrelated content, no clear directional bias\n\n"
+        "Classify based on impact on THAT specific token in brackets, not the general market.\n\n"
         f"Articles:\n{items_text}\n"
-        f"Respond ONLY with valid JSON: {{\"results\": [\"BULLISH\", \"NEUTRAL\", ...]}}\n"
+        f"Respond ONLY with valid JSON: {{\"results\": [\"BULLISH_ALTO\", \"NEUTRAL\", ...]}}\n"
         f"Return exactly {len(articles)} items in the same order."
     )
 
@@ -402,7 +406,7 @@ def classify_sentiment_batch(articles):
         cost = (msg.usage.input_tokens * 0.80 + msg.usage.output_tokens * 4.0) / 1_000_000
         log(f"Sentiment batch {len(articles)} articulos | ${cost:.5f}")
 
-        valid = {"BULLISH", "BEARISH", "NEUTRAL"}
+        valid = {"BULLISH_ALTO", "BULLISH_BAJO", "BEARISH", "NEUTRAL"}
         while len(results) < len(articles):
             results.append("NEUTRAL")
         return [r if r in valid else "NEUTRAL" for r in results[:len(articles)]]
@@ -562,6 +566,7 @@ def scan_news(symbols=None):
 
     # Clasificar sentimiento en lotes con Claude Haiku
     all_sentiments = []
+    breaking_news  = {}  # {symbol: titulo} para BULLISH_ALTO
     if pending:
         log(f"Clasificando sentimiento de {len(pending)} menciones con Claude Haiku...")
         for i in range(0, len(pending), SENTIMENT_BATCH_SIZE):
@@ -578,17 +583,25 @@ def scan_news(symbols=None):
         ]
         tracker = update_narrative_tracker(tracker, matched_with_sentiment, knowledge)
 
-        bullish = sum(1 for s in all_sentiments if s == "BULLISH")
-        bearish = sum(1 for s in all_sentiments if s == "BEARISH")
-        neutral = sum(1 for s in all_sentiments if s == "NEUTRAL")
-        log(f"Sentimiento: BULLISH={bullish} | BEARISH={bearish} | NEUTRAL={neutral}")
+        bullish_alto = sum(1 for s in all_sentiments if s == "BULLISH_ALTO")
+        bullish_bajo = sum(1 for s in all_sentiments if s == "BULLISH_BAJO")
+        bearish      = sum(1 for s in all_sentiments if s == "BEARISH")
+        neutral      = sum(1 for s in all_sentiments if s == "NEUTRAL")
+        log(f"Sentimiento: BULLISH_ALTO={bullish_alto} | BULLISH_BAJO={bullish_bajo} | BEARISH={bearish} | NEUTRAL={neutral}")
+
+        # Identificar tokens con breaking news (BULLISH_ALTO)
+        for (sym, title, _), sent in zip(pending, all_sentiments):
+            if sent == "BULLISH_ALTO":
+                if sym not in breaking_news:
+                    breaking_news[sym] = title
+                    log(f"[BREAKING] {sym}: '{title[:80]}'")
 
     save_news_seen(seen)
     save_tracker(tracker)
 
     log(f"Scan completado: {len(target_symbols)} tokens | "
         f"{total_new} articulos nuevos | {len(pending)} menciones clasificadas")
-    return scan_results
+    return scan_results, breaking_news
 
 
 # ── Resumen diario con Claude ─────────────────────────────────────────────────

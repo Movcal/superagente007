@@ -187,10 +187,13 @@ def evaluate(volume_alert, path="B"):
 
     # REGLA PRINCIPAL: doble confirmacion obligatoria
     # Volumen confirmado (ya lo tenemos por la alerta)
-    # Sentimiento debe ser POSITIVO
-    if sentiment["sentiment"] != "POSITIVO":
+    # Sentimiento debe ser POSITIVO — excepto en breaking news BULLISH_ALTO
+    is_breaking = volume_alert.get("breaking_news", False)
+    if sentiment["sentiment"] != "POSITIVO" and not is_breaking:
         log(f"{symbol} rechazado: sentimiento {sentiment['sentiment']}, se necesita POSITIVO")
         return None
+    if is_breaking and sentiment["sentiment"] != "POSITIVO":
+        log(f"{symbol} [BREAKING] override de sentimiento: noticia alto impacto, entrando aunque precio aun no confirma")
 
     # Confirmacion narrativa pre-spike: el volumen confirma lo que las noticias ya anunciaban
     narrative_conf = get_narrative_confirmation(symbol)

@@ -554,13 +554,20 @@ body {
 
   </div>
 
-  <!-- NARRATIVAS (CMC MCP - datos reales) -->
+  <!-- NARRATIVAS (Resumen diario del agente) -->
   <div class="card">
-    <div class="card-title" data-i18n="title_narratives">Narrativas del Mercado <span style="color:var(--green);font-size:9px;margin-left:6px;">● LIVE · CMC</span></div>
-    <div class="narratives-wrapper">
-      <div class="narratives-grid" id="narrativesGrid">
-        <div class="empty-state" style="grid-column:1/-1;" data-i18n="loading">Obteniendo datos...</div>
-      </div>
+    <div class="card-title" data-i18n="title_narratives">Narrativas del Mercado <span style="color:var(--gold);font-size:9px;margin-left:6px;">● ANÁLISIS DEL AGENTE</span></div>
+    <div id="narrativeSummaryDate" style="font-size:11px;color:var(--muted);margin-bottom:14px;"></div>
+    <div class="narratives-grid" id="narrativesGrid">
+      <div class="empty-state" style="grid-column:1/-1;" data-i18n="loading">Obteniendo datos...</div>
+    </div>
+    <div id="narrativeInsight" style="display:none; margin-top:16px; border-left:3px solid var(--gold); padding-left:14px;">
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">💡 Insight del Agente</div>
+      <div id="narrativeInsightText" style="font-size:13px;color:var(--text);line-height:1.7;"></div>
+    </div>
+    <div id="narrativeRisk" style="display:none; margin-top:12px; border-left:3px solid var(--red); padding-left:14px;">
+      <div style="font-size:10px;color:var(--red);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">⚠️ Alerta de Riesgo</div>
+      <div id="narrativeRiskText" style="font-size:12px;color:var(--muted);line-height:1.7;"></div>
     </div>
   </div>
 
@@ -887,37 +894,59 @@ function renderMarket(d) {
 }
 
 // ── Render narratives ───────────────────────────
-function narChangeColor(val) {
-  if (!val) return 'var(--muted)';
-  return val.startsWith('+') ? 'var(--green)' : val.startsWith('-') ? 'var(--red)' : 'var(--muted)';
-}
-
-function renderNarratives(list) {
+function renderNarratives(data) {
   const grid = document.getElementById('narrativesGrid');
-  if (!list || list.length === 0) {
-    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;">Sin datos de narrativas</div>`;
+  const list = data.narratives || [];
+
+  // Fecha del resumen
+  const dateEl = document.getElementById('narrativeSummaryDate');
+  if (data.summary_date) {
+    dateEl.textContent = `Análisis del agente · ${data.summary_date} 11:00 UTC`;
+  }
+
+  if (!list.length) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;">Resumen diario pendiente — disponible a las 11:00 UTC</div>`;
     return;
   }
+
+  const rankColors = ['var(--gold)', 'var(--blue)', 'var(--green)'];
   grid.innerHTML = list.map((n, i) => {
-    const rankColors = ['var(--gold)', 'var(--blue)', 'var(--green)', 'var(--orange)', 'var(--text)', 'var(--muted)'];
-    const color = rankColors[i] || 'var(--muted)';
-    const c24   = n.change_24h || '';
-    const c7d   = n.change_7d  || '';
-    const coins = n.top_coins.length ? n.top_coins.join(' · ') : '—';
-    const kws   = n.keywords.length  ? n.keywords.join(', ')   : '';
+    const color = rankColors[i] || 'var(--text)';
+    const tokensHtml = n.top_tokens.length ? n.top_tokens.map(t => {
+      const chg = t.change_24h;
+      const chgColor = chg >= 0 ? 'var(--green)' : 'var(--red)';
+      const chgStr = `${chg >= 0 ? '+' : ''}${chg}%`;
+      return `<span class="tag" style="color:${chgColor}">${esc(t.symbol)} ${chgStr}</span>`;
+    }).join('') : '<span class="tag">Sin datos</span>';
+
     return `
       <div class="nar-card">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-          <div class="nar-title" style="color:${color}">#${n.rank} ${esc(n.name)}</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <span style="font-size:11px;color:${color};font-weight:800;">#${n.rank}</span>
+          <div class="nar-title" style="color:${color};margin-bottom:0">${esc(n.name)}</div>
+          <span style="margin-left:auto;font-size:10px;color:var(--green);font-weight:700;">↑ TRENDING</span>
         </div>
-        ${kws ? `<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">${esc(kws)}</div>` : ''}
-        <div class="nar-stats">
-          <span class="tag" style="color:${narChangeColor(c24)}">24h: ${esc(c24) || '—'}</span>
-          <span class="tag" style="color:${narChangeColor(c7d)}">7d: ${esc(c7d) || '—'}</span>
-        </div>
-        <div style="font-size:11px;color:var(--muted);margin-top:8px;">Top: <strong style="color:var(--text)">${esc(coins)}</strong></div>
+        ${n.outlook ? `<div style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:12px;">${esc(n.outlook)}</div>` : ''}
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Mejor desempeño 24h</div>
+        <div class="nar-stats">${tokensHtml}</div>
       </div>`;
   }).join('');
+
+  // Insight
+  const insightEl = document.getElementById('narrativeInsight');
+  const insightText = document.getElementById('narrativeInsightText');
+  if (data.key_insight) {
+    insightEl.style.display = 'block';
+    insightText.textContent = data.key_insight;
+  }
+
+  // Risk alert
+  const riskEl = document.getElementById('narrativeRisk');
+  const riskText = document.getElementById('narrativeRiskText');
+  if (data.risk_alert) {
+    riskEl.style.display = 'block';
+    riskText.textContent = data.risk_alert;
+  }
 }
 
 // ── Fetch & refresh ────────────────────────────
@@ -935,7 +964,7 @@ async function fetchAll() {
     const nData    = await nRes.json();
     renderState(lastStateData);
     renderMarket(lastMarketData);
-    renderNarratives(nData.narratives || []);
+    renderNarratives(nData);
   } catch (e) {
     console.error('Error:', e);
   }
@@ -968,7 +997,7 @@ const LANGS = {
     title_decisions: 'Últimas Decisiones del Agente',
     no_decisions: 'Sin decisiones registradas',
     title_log: 'Log en Vivo', log_loading: 'Cargando log...',
-    title_narratives: 'Narrativas del Mercado — últimos 15 días',
+    title_narratives: 'Narrativas del Mercado',
     nar1_title: '🤖 Agentes IA',
     nar1_desc: 'Tokens vinculados a agentes autónomos de inteligencia artificial y automatización on-chain.',
     nar2_desc: 'Infraestructura física descentralizada: redes de sensores, computación y conectividad con incentivos tokenizados.',
@@ -1036,7 +1065,7 @@ const LANGS = {
     title_decisions: 'Latest Agent Decisions',
     no_decisions: 'No decisions recorded',
     title_log: 'Live Log', log_loading: 'Loading log...',
-    title_narratives: 'Market Narratives — last 15 days',
+    title_narratives: 'Market Narratives',
     nar1_title: '🤖 AI Agents',
     nar1_desc: 'Tokens linked to autonomous artificial intelligence agents and on-chain automation.',
     nar2_desc: 'Decentralized physical infrastructure: sensor networks, computing and connectivity with tokenized incentives.',

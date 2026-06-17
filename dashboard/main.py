@@ -364,9 +364,103 @@ async def get_market():
     return result
 
 
+CATEGORY_TOKENS = {
+    "layer-1":      ["ETH", "ADA", "TRX", "ATOM", "DOT", "NEAR", "AVAX", "BNB"],
+    "defi":         ["UNI", "AAVE", "CAKE", "SUSHI", "COMP", "PENDLE", "STG", "1INCH"],
+    "ai-infra":     ["FET", "0G", "AIOZ", "PEAQ", "SKYAI", "COAI"],
+    "memecoin":     ["DOGE", "SHIB", "BONK", "FLOKI", "CHEEMS"],
+    "payments":     ["XRP", "XLM", "ACH", "GENIUS", "WFI"],
+    "governance":   ["WLFI", "UNI", "COMP", "MKR"],
+    "infrastructure": ["LINK", "BAND", "API3", "ZIG"],
+    "privacy-coin": ["ZEC", "ROSE", "AXL"],
+    "rwa":          ["RIO", "CPOOL", "XCN"],
+    "layer-2":      ["ARB", "OP", "ZKS", "METIS"],
+    "layer-0":      ["DOT", "ATOM", "AXL"],
+    "oracle":       ["LINK", "BAND", "API3"],
+    "socialfi":     ["DESO", "LOOKS"],
+    "ai":           ["FET", "SKYAI", "0G", "AIOZ"],
+}
+
+CATEGORY_DISPLAY = {
+    "layer-1": "Layer 1", "defi": "DeFi", "ai-infra": "IA Infrastructure",
+    "memecoin": "Memecoins", "payments": "Payments", "governance": "Governance",
+    "infrastructure": "Infrastructure", "privacy-coin": "Privacy", "rwa": "RWA",
+    "layer-2": "Layer 2", "layer-0": "Layer 0", "oracle": "Oracles",
+    "socialfi": "SocialFi", "ai": "Inteligencia Artificial",
+}
+
+def get_token_changes(symbols):
+    """Obtiene cambio 24h de una lista de symbols via CMC."""
+    if not symbols or not CMC_API_KEY:
+        return {}
+    try:
+        r = requests.get(
+            "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest",
+            headers={"X-CMC_PRO_API_KEY": CMC_API_KEY},
+            params={"symbol": ",".join(symbols), "convert": "USD"},
+            timeout=10
+        )
+        if r.status_code == 200:
+            out = {}
+            for sym, data in r.json().get("data", {}).items():
+                if isinstance(data, list): data = data[0]
+                chg = data.get("quote", {}).get("USD", {}).get("percent_change_24h", None)
+                if chg is not None:
+                    out[sym] = round(chg, 2)
+            return out
+    except Exception:
+        pass
+    return {}
+
+
 @app.get("/api/narratives", dependencies=[Depends(verify_token)])
 async def get_narratives():
-    return {"narratives": fetch_narratives_from_mcp()}
+    # Leer el resumen diario mas reciente
+    summaries_dir = BASE_DIR / "data" / "daily_summaries"
+    summary = None
+    if summaries_dir.exists():
+        files = sorted(summaries_dir.glob("*.json"), reverse=True)
+        if files:
+            try:
+                summary = json.loads(files[0].read_text(encoding="utf-8"))
+            except Exception:
+                pass
+
+    if not summary:
+        return {"narratives": [], "key_insight": None, "risk_alert": None, "summary_date": None}
+
+    trending_up   = summary.get("trending_up", [])[:3]
+    sector_outlook = summary.get("sector_outlook", {})
+
+    # Para cada narrativa top: obtener tokens y su % 24h
+    all_symbols = []
+    for cat in trending_up:
+        all_symbols += CATEGORY_TOKENS.get(cat, [])
+    changes = get_token_changes(list(set(all_symbols)))
+
+    narratives = []
+    for i, cat in enumerate(trending_up):
+        tokens = CATEGORY_TOKENS.get(cat, [])
+        # Ordenar por mejor % 24h
+        ranked = sorted(
+            [(sym, changes.get(sym)) for sym in tokens if changes.get(sym) is not None],
+            key=lambda x: x[1], reverse=True
+        )
+        top2 = ranked[:2]  # Solo mostramos 2 tokens (no revelamos todo)
+        narratives.append({
+            "rank":    i + 1,
+            "cat":     cat,
+            "name":    CATEGORY_DISPLAY.get(cat, cat),
+            "outlook": sector_outlook.get(cat, ""),
+            "top_tokens": [{"symbol": s, "change_24h": c} for s, c in top2],
+        })
+
+    return {
+        "narratives":    narratives,
+        "key_insight":   summary.get("key_insight"),
+        "risk_alert":    summary.get("risk_alert"),
+        "summary_date":  summary.get("date"),
+    }
 
 
 @app.get("/api/costs", dependencies=[Depends(verify_token)])

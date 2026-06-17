@@ -6,7 +6,7 @@ from fastapi import FastAPI, Header, HTTPException, Depends
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
-import json, os, re, requests, time
+import json, os, re, requests, time, subprocess
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -26,12 +26,15 @@ CMC_MCP_URL       = "https://mcp.coinmarketcap.com/mcp"
 _narratives_cache = {"data": None, "ts": 0}
 NARRATIVES_TTL    = 86400  # segundos
 
+# Cache de wallet (1 hora)
+_wallet_cache = {"total_usd": None, "ts": 0}
+WALLET_TTL    = 3600  # segundos
+
 app = FastAPI(title="Superagente007 Dashboard")
 
-# CORS restringido a localhost unicamente
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8080", "http://127.0.0.1:8080"],
+    allow_origins=["*"],
     allow_methods=["GET"],
     allow_headers=["X-Dashboard-Token"],
 )
@@ -110,6 +113,31 @@ def fmt_usd(v):
     if v >= 1e9:  return f"${v/1e9:.1f}B"
     if v >= 1e6:  return f"${v/1e6:.1f}M"
     return f"${v:,.0f}"
+
+
+# ── wallet balance helper ─────────────────────────────────────────────────────
+
+def get_wallet_total_usd():
+    """Obtiene el total USD de la wallet via twak. Cache 1 hora."""
+    now = time.time()
+    if _wallet_cache["total_usd"] is not None and (now - _wallet_cache["ts"]) < WALLET_TTL:
+        return _wallet_cache["total_usd"]
+    try:
+        result = subprocess.run(
+            ["twak", "wallet", "portfolio"],
+            capture_output=True, text=True, timeout=30
+        )
+        for line in result.stdout.splitlines():
+            if "Total USD:" in line:
+                m = re.search(r'\$([0-9]+\.?[0-9]*)', line)
+                if m:
+                    total = float(m.group(1))
+                    _wallet_cache["total_usd"] = total
+                    _wallet_cache["ts"] = now
+                    return total
+    except Exception:
+        pass
+    return _wallet_cache["total_usd"] if _wallet_cache["total_usd"] is not None else CAPITAL_TOTAL
 
 
 # ── CMC MCP helper ────────────────────────────────────────────────────────────
@@ -204,9 +232,9 @@ async def get_state():
         "agent_status": "ACTIVO",
         "last_cycle": last_cycle or "Sin ciclos registrados",
         "cycles_today": cycles_today,
-        "capital_total": CAPITAL_TOTAL,
+        "capital_total": get_wallet_total_usd(),
         "capital_desplegado": round(capital_desplegado, 2),
-        "capital_libre": round(CAPITAL_TOTAL - capital_desplegado, 2),
+        "capital_libre": round(get_wallet_total_usd() - capital_desplegado, 2),
         "open_positions": open_positions,
         "total_positions": len(open_positions),
         "max_positions": MAX_POSICIONES,
@@ -379,5 +407,5 @@ async def get_costs():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="127.0.0.1", port=8080, reload=True,
+    uvicorn.run("main:app", host="0.0.0.0", port=8080, reload=True,
                 app_dir=str(DASHBOARD_DIR))

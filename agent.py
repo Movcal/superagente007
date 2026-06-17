@@ -35,12 +35,36 @@ def run_cycle():
     check_positions()
 
     # 2. Seguimiento de volumen en watchlist (anticipacion pre-spike)
+    evaluated_from_watchlist = set()
     try:
         watchlist_alerts = check_watchlist_volume()
         for wa in watchlist_alerts:
             if wa["level"] >= 2:  # ACELERANDO o SPIKE
                 log(f"[WATCHLIST] ATENCION: {wa['symbol']} volumen {wa['status']} "
                     f"{wa['ratio']}x | narrativa {wa['narrative']} ({wa['bull_score']}% bullish)")
+
+            # Entrada temprana: ACELERANDO (2.5x+) con narrativa bullish >= 50%
+            # No esperar el 5x si la narrativa ya esta confirmada
+            if wa["level"] == 2 and wa.get("bull_score", 0) >= 50:
+                sym = wa["symbol"]
+                log(f"[WATCHLIST] ENTRADA ANTICIPADA: {sym} {wa['ratio']}x + narrativa {wa['bull_score']}% bullish")
+                early_alert = {
+                    "symbol":    sym,
+                    "ratio":     wa["ratio"],
+                    "current_volume": 0,
+                    "avg_volume": 0,
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "priority":  True,
+                }
+                decision = evaluate_decision(early_alert, path="A")
+                evaluated_from_watchlist.add(sym)
+                if decision:
+                    log(f"Decision WATCHLIST: COMPRAR {sym} con ${decision['capital']}")
+                    position = buy(decision)
+                    if position:
+                        log(f"Posicion abierta via watchlist en {sym}")
+                    else:
+                        log(f"Fallo al abrir posicion watchlist en {sym}")
     except Exception as e:
         log(f"Error en check_watchlist_volume: {e}")
 
@@ -48,10 +72,11 @@ def run_cycle():
     log("--- Monitoreando volumen ---")
     volume_alerts = check_volumes()
 
-    # 3. Para cada alerta de volumen, evaluar si entrar
+    # Para cada alerta de volumen, evaluar si entrar (skip tokens ya evaluados via watchlist)
     if volume_alerts:
-        log(f"Alertas de volumen detectadas: {len(volume_alerts)}")
-        for alert in volume_alerts:
+        new_alerts = [a for a in volume_alerts if a["symbol"] not in evaluated_from_watchlist]
+        log(f"Alertas de volumen detectadas: {len(new_alerts)}")
+        for alert in new_alerts:
             symbol = alert["symbol"]
             log(f"Evaluando oportunidad en {symbol} ({alert['ratio']}x volumen)...")
             decision = evaluate_decision(alert, path="B")

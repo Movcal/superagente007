@@ -278,6 +278,27 @@ async def get_market():
             stable_dom       = round(sum(mcp.get(k, 0) for k in stable_keys), 1)
             stable_mc        = total_mc * stable_dom / 100
 
+            # Cambio 24h de stablecoins via CoinGecko markets
+            stable_change_24h = None
+            try:
+                sr = requests.get(
+                    "https://api.coingecko.com/api/v3/coins/markets",
+                    params={"vs_currency": "usd", "ids": "tether,usd-coin,dai,first-digital-usd,binance-usd",
+                            "order": "market_cap_desc", "per_page": 5, "page": 1},
+                    timeout=8
+                )
+                if sr.status_code == 200:
+                    stable_coins = sr.json()
+                    total_stable_mc = sum(c.get("market_cap", 0) for c in stable_coins)
+                    if total_stable_mc > 0:
+                        weighted_chg = sum(
+                            c.get("market_cap_change_percentage_24h", 0) * c.get("market_cap", 0)
+                            for c in stable_coins
+                        ) / total_stable_mc
+                        stable_change_24h = round(weighted_chg, 2)
+            except Exception:
+                pass
+
             result["global"] = {
                 "total_market_cap_formatted":      fmt_usd(total_mc),
                 "total_market_cap_usd":            total_mc,
@@ -286,6 +307,7 @@ async def get_market():
                 "eth_dominance":                   eth_dom,
                 "stablecoin_dominance":            stable_dom,
                 "stablecoin_market_cap_formatted": fmt_usd(stable_mc),
+                "stablecoin_change_24h":           stable_change_24h,
             }
 
             # Interpretacion del agente — BTC dominance

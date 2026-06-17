@@ -492,7 +492,7 @@ body {
 
       <div>
         <div style="margin-bottom:20px">
-          <div class="metric-name" data-i18n="mc_name">Market Cap Total — todo el cripto</div>
+          <div class="metric-name" data-i18n="mc_name">Market Cap Total — todo el ecosistema cripto</div>
           <div class="metric-val" id="totalMC">—</div>
           <div class="mc-bar">
             <div class="mc-fill" style="width:100%; background:linear-gradient(90deg,var(--blue),var(--green))"></div>
@@ -508,8 +508,9 @@ body {
           <div class="mc-bar">
             <div class="mc-fill" id="stableBar" style="width:0%; background:var(--gold)"></div>
           </div>
-          <div style="font-size:11px; color:var(--muted)">
-            <span id="stablePct">—%</span> <span data-i18n="of_total">del mercado total</span>
+          <div style="font-size:11px; color:var(--muted); display:flex; gap:14px;">
+            <span><span id="stablePct">—%</span> <span data-i18n="of_total">del mercado total</span></span>
+            <span><span data-i18n="mc_change">Cambio 24h:</span> <strong id="stableChange" style="color:var(--text)">—</strong></span>
           </div>
         </div>
 
@@ -857,8 +858,13 @@ function renderMarket(d) {
       `<span style="color:${chg >= 0 ? 'var(--green)' : 'var(--red)'}">${chg >= 0 ? '+' : ''}${chg}%</span>`;
     document.getElementById('stableMC').textContent = g.stablecoin_market_cap_formatted;
     document.getElementById('stablePct').textContent = `${g.stablecoin_dominance}%`;
-    // bar width: scale 0-20% of market → 0-100% bar width
     document.getElementById('stableBar').style.width = `${Math.min(g.stablecoin_dominance * 5, 100)}%`;
+    const sc = g.stablecoin_change_24h;
+    if (sc !== null && sc !== undefined) {
+      const scEl = document.getElementById('stableChange');
+      scEl.textContent = `${sc >= 0 ? '+' : ''}${sc}%`;
+      scEl.style.color = sc >= 0 ? 'var(--green)' : 'var(--red)';
+    }
   }
 
   if (d.agent_interpretation) {
@@ -950,7 +956,7 @@ const LANGS = {
     loading: 'Obteniendo datos...',
     title_btc: 'Dominancia BTC', others: 'Otros',
     title_stables: 'Stablecoins vs Mercado Cripto Total',
-    mc_name: 'Market Cap Total — todo el cripto', mc_change: 'Cambio 24h:',
+    mc_name: 'Market Cap Total — todo el ecosistema cripto', mc_change: 'Cambio 24h:',
     stable_name: 'Stablecoins — dinero en reserva', of_total: 'del mercado total',
     calculating: 'Calculando señal...',
     agent_explains: '📊 El agente explica',

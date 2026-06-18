@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import sys
 import pathlib
 import requests
@@ -102,7 +103,7 @@ def check_mcp_exit_signals(symbol):
                 content = (row[1] if len(row) > 1 else "").lower()
                 combined = title + " " + content
                 for kw in NEWS_EXIT_KEYWORDS:
-                    if kw in combined:
+                    if re.search(r'\b' + re.escape(kw) + r'\b', combined):
                         return True, f"noticia negativa detectada: '{kw}' en '{row[0][:60]}'"
 
         # 2. Agotamiento — requiere los 3 juntos: RSI>70 + MACD negativo + volumen normalizado

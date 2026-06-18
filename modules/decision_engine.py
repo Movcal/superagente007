@@ -12,7 +12,8 @@ from modules.technical_screener import get_token_ta
 load_dotenv()
 
 CAPITAL_TOTAL = float(os.getenv("CAPITAL_TOTAL", 100))
-CAPITAL_POR_POSICION = float(os.getenv("CAPITAL_POR_POSICION", 50))
+CAPITAL_POR_POSICION_PCT = float(os.getenv("CAPITAL_POR_POSICION_PCT", 47))  # % del capital total por posicion
+CAPITAL_COMPLIANCE_PCT = float(os.getenv("CAPITAL_COMPLIANCE_PCT", 6))       # % reservado para trade diario obligatorio
 MAX_POSICIONES = int(os.getenv("MAX_POSICIONES", 2))
 POSITIONS_FILE = "data/open_positions.json"
 DECISIONS_LOG = "logs/decisions.log"
@@ -39,26 +40,32 @@ def save_positions(positions):
 
 
 def get_available_capital():
-    """Calcula el capital disponible segun posiciones abiertas."""
+    """Calcula el capital disponible descontando posiciones abiertas y reserva de compliance."""
     positions = load_positions()
-    capital_usado = sum(p.get("capital", 0) for p in positions)
-    return max(0, CAPITAL_TOTAL - capital_usado)
+    open_positions = [p for p in positions if p.get("status") == "OPEN"]
+    capital_usado = sum(p.get("capital", 0) for p in open_positions)
+    reserva_compliance = round(CAPITAL_TOTAL * CAPITAL_COMPLIANCE_PCT / 100, 2)
+    return max(0, CAPITAL_TOTAL - capital_usado - reserva_compliance)
 
 
 def calculate_position_size(volume_ratio, sentiment_score, is_priority, symbol=""):
     """
-    El agente decide cuanto capital usar segun la calidad de la oportunidad.
-    - Oportunidad fuerte: hasta CAPITAL_POR_POSICION
-    - Oportunidad media: 50% de CAPITAL_POR_POSICION
-    - Oportunidad debil: 25% de CAPITAL_POR_POSICION
+    Calcula el capital a usar como porcentaje del capital total.
+    - Oportunidad fuerte (score >= 0.7): 100% del maximo por posicion (47% del total)
+    - Oportunidad media  (score >= 0.5):  50% del maximo por posicion
+    - Oportunidad debil  (score <  0.5):  25% del maximo por posicion
+    Siempre respeta el capital disponible (descontando posiciones abiertas y reserva compliance).
     """
     available = get_available_capital()
     if available <= 0:
         return 0
 
+    # Maximo por posicion en dolares (47% del capital total)
+    max_por_posicion = round(CAPITAL_TOTAL * CAPITAL_POR_POSICION_PCT / 100, 2)
+
     # Score de oportunidad (0 a 1)
     volume_score = min(1.0, (volume_ratio - 5) / 10 + 0.5)  # 5x = 0.5, 10x = 1.0
-    sentiment_normalized = (sentiment_score + 1) / 2  # -1..1 -> 0..1
+    sentiment_normalized = (sentiment_score + 1) / 2        # -1..1 -> 0..1
     opportunity_score = (volume_score * 0.6) + (sentiment_normalized * 0.4)
 
     if is_priority:
@@ -73,13 +80,13 @@ def calculate_position_size(volume_ratio, sentiment_score, is_priority, symbol="
         except Exception:
             pass  # no bloquear la decision si market_intelligence falla
 
-    # Tamano de posicion
+    # Tamano de posicion segun calidad de la oportunidad
     if opportunity_score >= 0.7:
-        size = CAPITAL_POR_POSICION
+        size = max_por_posicion
     elif opportunity_score >= 0.5:
-        size = CAPITAL_POR_POSICION * 0.5
+        size = max_por_posicion * 0.5
     else:
-        size = CAPITAL_POR_POSICION * 0.25
+        size = max_por_posicion * 0.25
 
     return round(min(size, available), 2)
 
@@ -172,14 +179,15 @@ def evaluate(volume_alert, path="B"):
 
     log(f"Evaluando {symbol} (volumen: {volume_ratio}x, camino: {path})")
 
-    # Verificar si ya tenemos posicion en este token
+    # Verificar si ya tenemos posicion ABIERTA en este token
     positions = load_positions()
-    if any(p["symbol"] == symbol for p in positions):
+    open_positions = [p for p in positions if p.get("status") == "OPEN"]
+    if any(p["symbol"] == symbol for p in open_positions):
         log(f"{symbol} ya tiene posicion abierta, ignorando")
         return None
 
-    # Verificar limite de posiciones
-    if len(positions) >= MAX_POSICIONES:
+    # Verificar limite de posiciones (solo cuenta OPEN)
+    if len(open_positions) >= MAX_POSICIONES:
         log(f"Maximo de posiciones alcanzado ({MAX_POSICIONES}), ignorando {symbol}")
         return None
 

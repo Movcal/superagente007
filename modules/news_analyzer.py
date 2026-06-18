@@ -158,7 +158,7 @@ def fetch_token_news(client, symbol):
     # Retorna los titulos y contenido resumido de las 3 noticias mas recientes
     news = []
     for row in rows[:3]:
-        news.append({"title": row[0], "summary": row[1][:200] if len(row) > 1 else ""})
+        news.append({"title": row[0], "summary": row[1][:200] if len(row) > 1 and row[1] else ""})
     return news
 
 

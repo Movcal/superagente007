@@ -262,43 +262,43 @@ def _call_claude(symbol, context):
     ta_section = ""
     if context.get("ta_analysis"):
         in_wl = context.get("in_watchlist", False)
-        wl_label = "CON narrativa previa acumulada en watchlist" if in_wl else "SIN narrativa previa (spike inesperado — investigar causa)"
+        wl_label = "WITH pre-existing narrative accumulated in watchlist" if in_wl else "WITHOUT prior narrative (unexpected spike — investigate cause)"
         ta_section = f"""
-## ANALISIS TECNICO DEL TOKEN ({wl_label})
+## TOKEN TECHNICAL ANALYSIS ({wl_label})
 {context["ta_analysis"]}
-- Si ta_rating=avoid pero las noticias detectan suelo, podes PROCEED con REDUCE_SIZE
-- Si el token NO tiene narrativa previa, investigar si el spike es panico, euforia o narrativa emergente
+- If ta_rating=avoid but news signals a bottom, you may PROCEED with REDUCE_SIZE
+- If the token has NO prior narrative, investigate whether the spike is panic, euphoria, or emerging narrative
 """
 
-    prompt = f"""Sos un analista de trading cripto especializado en BSC/BNB Chain.
-Analizá el contexto actual y decidí si es momento de comprar {symbol}.
+    prompt = f"""You are a crypto trading analyst specialized in BSC/BNB Chain.
+Analyze the current context and decide whether now is the right time to buy {symbol}.
 
-## REGLAS DEL OPERADOR (seguirlas siempre)
+## OPERATOR RULES (always follow these)
 {rules}
 {ta_section}
-## CONTEXTO DE MERCADO AHORA
+## CURRENT MARKET CONTEXT
 {ctx_text}
 
-## GUIA DE INTERPRETACION
-- global_metrics: Fear & Greed < 25 = panico extremo (SKIP). Caida market cap 24h > 5% = cautela (REDUCE_SIZE).
-- technical_analysis: RSI14 > 70 = sobrecomprado (REDUCE_SIZE o SKIP). MACD histogram positivo y creciendo = momentum alcista (PROCEED).
-- token_news: noticias negativas recientes sobre el token (hack, exploit, dump coordinado) = SKIP.
-- trending_narratives: si el sector del token esta entre los top 3 narrativas con cambio positivo = favor de PROCEED.
-- macro_events: eventos macro de alto impacto en las proximas 24-48h = REDUCE_SIZE o SKIP segun gravedad.
+## INTERPRETATION GUIDE
+- global_metrics: Fear & Greed < 25 = extreme panic (SKIP). Market cap 24h drop > 5% = caution (REDUCE_SIZE).
+- technical_analysis: RSI14 > 70 = overbought (REDUCE_SIZE or SKIP). Positive and growing MACD histogram = bullish momentum (PROCEED).
+- token_news: recent negative news about the token (hack, exploit, coordinated dump) = SKIP.
+- trending_narratives: if the token's sector is among the top 3 narratives with positive change = favor PROCEED.
+- macro_events: high-impact macro events in the next 24-48h = REDUCE_SIZE or SKIP depending on severity.
 
-## INSTRUCCION
-Respondé SOLO con JSON valido, sin texto extra:
+## INSTRUCTION
+Respond ONLY with valid JSON, no extra text:
 {{
   "bias": "bullish" | "bearish" | "neutral",
   "confidence": 0.0,
   "action_modifier": "PROCEED" | "SKIP" | "REDUCE_SIZE",
-  "reason": "una linea explicando la decision",
-  "risk_notes": "riesgo importante si hay alguno, sino null"
+  "reason": "one line explaining the decision",
+  "risk_notes": "important risk if any, otherwise null"
 }}
 
-- PROCEED    : contexto favorable, continuar con la decision original
-- SKIP       : contexto negativo (guerra, hack, crash macro, RSI extremo), no entrar ahora
-- REDUCE_SIZE: entrar pero con 50% menos capital del calculado
+- PROCEED    : favorable context, proceed with the original decision
+- SKIP       : negative context (war, hack, macro crash, extreme RSI), do not enter now
+- REDUCE_SIZE: enter but with 50% less capital than calculated
 """
 
     try:

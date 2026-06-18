@@ -292,37 +292,37 @@ def get_narrative_confirmation(symbol, knowledge=None, tracker=None):
     if total_articles == 0:
         return {
             "confirmed": False,
-            "strength": "ninguna",
+            "strength": "none",
             "bull_score": 0,
             "positive_days": 0,
             "total_articles": 0,
-            "message": "Sin cobertura de noticias en los ultimos 3 dias"
+            "message": "No news coverage in the last 3 days"
         }
 
     bull_score = round(total_pos / total_articles * 100)
 
     if bull_score >= 60 and positive_days >= 2:
-        strength  = "fuerte"
+        strength  = "strong"
         confirmed = True
-        msg = (f"Narrativa FUERTE pre-existente: {bull_score}% bullish "
-               f"({total_pos} positivas / {total_articles} totales en {positive_days} dias) — "
-               f"el mercado ya venia hablando bien de este token antes del spike")
+        msg = (f"STRONG pre-existing narrative: {bull_score}% bullish "
+               f"({total_pos} positive / {total_articles} total over {positive_days} days) — "
+               f"market was already building momentum on this token before the spike")
     elif bull_score >= 40 and positive_days >= 1:
-        strength  = "moderada"
+        strength  = "moderate"
         confirmed = True
-        msg = (f"Narrativa MODERADA pre-existente: {bull_score}% bullish "
-               f"({total_pos} positivas / {total_articles} totales) — "
-               f"hay interes pero no es masivo")
+        msg = (f"MODERATE pre-existing narrative: {bull_score}% bullish "
+               f"({total_pos} positive / {total_articles} total) — "
+               f"there is interest but not yet widespread")
     elif bull_score >= 25:
-        strength  = "debil"
+        strength  = "weak"
         confirmed = False
-        msg = (f"Narrativa DEBIL: {bull_score}% bullish — "
-               f"el spike de volumen no tiene respaldo de noticias solido")
+        msg = (f"WEAK narrative: {bull_score}% bullish — "
+               f"volume spike lacks solid news backing")
     else:
-        strength  = "ninguna"
+        strength  = "none"
         confirmed = False
-        msg = (f"Sin narrativa bullish ({bull_score}% positivo, {total_neg} negativas) — "
-               f"el spike podria ser ruido o manipulacion sin fundamento")
+        msg = (f"No bullish narrative ({bull_score}% positive, {total_neg} negative) — "
+               f"spike may be noise or manipulation without fundamentals")
 
     return {
         "confirmed": confirmed,

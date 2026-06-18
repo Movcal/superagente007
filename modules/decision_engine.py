@@ -113,22 +113,22 @@ def estimate_hold_time(volume_ratio, sentiment_score, narrative):
     """Estima cuanto tiempo mantener la posicion."""
     if volume_ratio >= 10 and sentiment_score >= 0.4:
         hours_min, hours_max = 4, 12
-        reason = "señal muy fuerte, movimiento rapido esperado"
+        reason = "very strong signal, fast move expected"
     elif volume_ratio >= 7 or sentiment_score >= 0.3:
         hours_min, hours_max = 2, 6
-        reason = "señal moderada-fuerte"
+        reason = "moderate-strong signal"
     else:
         hours_min, hours_max = 1, 4
-        reason = "señal moderada, monitorear de cerca"
+        reason = "moderate signal, monitor closely"
 
-    # Ajuste por narrativa
+    # Narrative adjustment
     if narrative in ["meme"]:
         hours_min = max(1, hours_min // 2)
         hours_max = hours_max // 2
-        reason += " (meme: salida rapida)"
+        reason += " (meme: quick exit)"
     elif narrative in ["defi", "bnb_ecosistema"]:
         hours_max = int(hours_max * 1.5)
-        reason += " (narrativa solida, puede durar mas)"
+        reason += " (solid narrative, may last longer)"
 
     return hours_min, hours_max, reason
 
@@ -144,43 +144,43 @@ def generate_reasoning(symbol, volume_alert, sentiment_result, capital, hold_min
     is_priority = sentiment_result.get("is_priority", False)
 
     lines = [
-        f"ENTRADA en {symbol} | ${capital:.2f} USDT",
+        f"ENTRY in {symbol} | ${capital:.2f} USDT",
         f"",
-        f"SEÑALES DE ENTRADA:",
-        f"  Volumen: {volume_alert['ratio']}x su promedio (threshold: 5x) — confirmado",
-        f"  Sentimiento: {sentiment_result['sentiment']} (score: {sentiment_result['score']})",
-        f"  Precio actual: ${price:.4f} | 1h: {change_1h:+.2f}% | 24h: {change_24h:+.2f}%",
-        f"  Narrativa: {narrative}",
-        f"  En trending CMC: {'Si' if in_trending else 'No'}",
+        f"ENTRY SIGNALS:",
+        f"  Volume: {volume_alert['ratio']}x avg (threshold: 5x) — confirmed",
+        f"  Sentiment: {sentiment_result['sentiment']} (score: {sentiment_result['score']})",
+        f"  Current price: ${price:.4f} | 1h: {change_1h:+.2f}% | 24h: {change_24h:+.2f}%",
+        f"  Narrative: {narrative}",
+        f"  CMC trending: {'Yes' if in_trending else 'No'}",
     ]
 
     if is_priority:
-        lines.append(f"  Token prioritario del ecosistema BNB: Si")
+        lines.append(f"  BNB ecosystem priority token: Yes")
 
-    # Confirmacion narrativa pre-spike
+    # Narrative confirmation pre-spike
     if narrative_conf:
-        strength = narrative_conf.get("strength", "ninguna")
+        strength = narrative_conf.get("strength", "none")
         confirmed = narrative_conf.get("confirmed", False)
         bull_score = narrative_conf.get("bull_score", 0)
         pos_days = narrative_conf.get("positive_days", 0)
         if confirmed:
             lines.append(f"")
-            lines.append(f"DOBLE CONFIRMACION NARRATIVA + VOLUMEN:")
+            lines.append(f"DUAL NARRATIVE + VOLUME CONFIRMATION:")
             lines.append(f"  {narrative_conf['message']}")
         else:
             lines.append(f"")
-            lines.append(f"ADVERTENCIA NARRATIVA: {narrative_conf['message']}")
+            lines.append(f"NARRATIVE WARNING: {narrative_conf['message']}")
 
     lines += [
         f"",
-        f"PERIODO ESTIMADO: {hold_min}-{hold_max} horas ({hold_reason})",
+        f"ESTIMATED HOLD: {hold_min}-{hold_max} hours ({hold_reason})",
         f"",
-        f"CONDICIONES DE SALIDA:",
-        f"  - Precio sube +15% desde entrada (toma de ganancias)",
-        f"  - Precio baja -8% desde entrada (stop loss)",
-        f"  - Volumen vuelve a promedio (señal agotada)",
-        f"  - BTC cae mas de 3% (proteccion macro)",
-        f"  - Tiempo maximo: {hold_max} horas sin importar el precio",
+        f"EXIT CONDITIONS:",
+        f"  - Price rises +15% from entry (take profit)",
+        f"  - Price drops -8% from entry (stop loss)",
+        f"  - Volume returns to average (signal exhausted)",
+        f"  - BTC drops more than 3% (macro protection)",
+        f"  - Max hold: {hold_max} hours regardless of price",
     ]
 
     return "\n".join(lines)

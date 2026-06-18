@@ -316,13 +316,26 @@ def sell(position, reason="señal de salida"):
 def compliance_trade():
     """
     Trade minimo de cumplimiento diario.
-    Compra y vende CAKE con $1 para registrar actividad.
+    Compra CAKE con el 6% del balance real y vende inmediatamente.
     """
+    import time
     log("=== TRADE DE CUMPLIMIENTO DIARIO ===")
+
+    # Calcular capital: 6% del balance real de USDT
+    try:
+        from modules.reconcile import get_usdt_balance
+        usdt_balance = get_usdt_balance() or 0
+    except Exception:
+        usdt_balance = 0
+
+    capital = round(usdt_balance * 0.06, 2)
+    if capital < 0.50:
+        capital = 0.50  # minimo absoluto para que el swap no falle por dust
+    log(f"Balance USDT: ${usdt_balance:.2f} | Capital compliance: ${capital:.2f} (6%)")
 
     fake_decision = {
         "symbol": "CAKE",
-        "capital": 1.0,
+        "capital": capital,
         "entry_time": datetime.utcnow().isoformat(),
         "hold_min_hours": 0,
         "hold_max_hours": 0,
@@ -338,9 +351,21 @@ def compliance_trade():
         log("Compliance trade: fallo la compra")
         return False
 
-    # Vender inmediatamente
-    import time
-    time.sleep(5)
+    # Vender inmediatamente — esperar confirmacion del swap de compra
+    time.sleep(10)
+
+    # En modo real, obtener el balance actual de CAKE para vender
+    if not PAPER_MODE:
+        from modules.reconcile import get_token_balance_twak
+        cake_contract = get_contract("CAKE")
+        cake_balance = get_token_balance_twak(cake_contract) if cake_contract else 0
+        if cake_balance and cake_balance > 0:
+            position["tokens"] = cake_balance
+            log(f"Balance CAKE para venta: {cake_balance}")
+        else:
+            log("Compliance trade: no se pudo obtener balance de CAKE para vender")
+            return False
+
     result = sell(position, reason="compliance trade - venta inmediata")
     return result
 

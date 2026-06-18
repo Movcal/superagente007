@@ -562,11 +562,11 @@ body {
       <div class="empty-state" style="grid-column:1/-1;" data-i18n="loading">Obteniendo datos...</div>
     </div>
     <div id="narrativeInsight" style="display:none; margin-top:16px; border-left:3px solid var(--gold); padding-left:14px;">
-      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">💡 Insight del Agente</div>
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">💡 Agent Insight</div>
       <div id="narrativeInsightText" style="font-size:13px;color:var(--text);line-height:1.7;"></div>
     </div>
     <div id="narrativeRisk" style="display:none; margin-top:12px; border-left:3px solid var(--red); padding-left:14px;">
-      <div style="font-size:10px;color:var(--red);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">⚠️ Alerta de Riesgo</div>
+      <div style="font-size:10px;color:var(--red);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">⚠️ Risk Alert</div>
       <div id="narrativeRiskText" style="font-size:12px;color:var(--muted);line-height:1.7;"></div>
     </div>
   </div>
@@ -901,7 +901,7 @@ function renderNarratives(data) {
   // Fecha del resumen
   const dateEl = document.getElementById('narrativeSummaryDate');
   if (data.summary_date) {
-    dateEl.textContent = `Análisis del agente · ${data.summary_date} 11:00 UTC`;
+    dateEl.textContent = `Agent analysis · ${data.summary_date} 11:00 UTC`;
   }
 
   if (!list.length) {
@@ -927,7 +927,7 @@ function renderNarratives(data) {
           <span style="margin-left:auto;font-size:10px;color:var(--green);font-weight:700;">↑ TRENDING</span>
         </div>
         ${n.outlook ? `<div style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:12px;">${esc(n.outlook)}</div>` : ''}
-        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Mejor desempeño 24h</div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Best performer 24h</div>
         <div class="nar-stats">${tokensHtml}</div>
       </div>`;
   }).join('');

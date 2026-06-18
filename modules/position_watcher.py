@@ -10,7 +10,9 @@ from dotenv import load_dotenv
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 load_dotenv()
 
-CMC_API_KEY    = os.getenv("CMC_API_KEY")
+CMC_API_KEY       = os.getenv("CMC_API_KEY")
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+CLAUDE_MODEL      = "claude-haiku-4-5-20251001"
 CMC_MCP_URL    = "https://mcp.coinmarketcap.com/mcp"
 POSITIONS_FILE = "data/open_positions.json"
 WATCHER_LOG    = "logs/position_watcher.log"
@@ -25,7 +27,7 @@ BTC_DROP_ALERT_PCT = -3.0  # salir de alts si BTC cae 3%
 # Palabras clave de noticias negativas que fuerzan salida inmediata
 NEWS_EXIT_KEYWORDS = [
     "hack", "exploit", "rug", "scam", "fraud", "arrest", "ban",
-    "sec", "lawsuit", "breach", "attack", "stolen", "insolvent",
+    "lawsuit", "breach", "attack", "stolen", "insolvent",
     "bankrupt", "shutdown", "suspend", "delist", "delisted"
 ]
 
@@ -99,12 +101,15 @@ def check_mcp_exit_signals(symbol):
         if news_data:
             rows = news_data.get("rows", [])
             for row in rows[:5]:
-                title   = (row[0] if len(row) > 0 else "").lower()
-                content = (row[1] if len(row) > 1 else "").lower()
-                combined = title + " " + content
+                title   = (row[0] if len(row) > 0 else "")
+                content = (row[1] if len(row) > 1 else "")
+                combined = (title + " " + content).lower()
                 for kw in NEWS_EXIT_KEYWORDS:
                     if re.search(r'\b' + re.escape(kw) + r'\b', combined):
-                        return True, f"noticia negativa detectada: '{kw}' en '{row[0][:60]}'"
+                        log(f"Keyword '{kw}' detectado en '{title[:60]}' — evaluando con Claude...")
+                        if _evaluate_news_with_claude(symbol, kw, title, content):
+                            return True, f"noticia negativa actual confirmada: '{kw}' en '{title[:60]}'"
+                        # Si Claude dice que es historico, seguir revisando otras noticias
 
         # 2. Agotamiento — requiere los 3 juntos: RSI>70 + MACD negativo + volumen normalizado
         ta = _mcp_call(session, "get_crypto_technical_analysis", {"id": cmc_id})
@@ -145,6 +150,53 @@ def check_mcp_exit_signals(symbol):
     except Exception as e:
         log(f"Error en check_mcp_exit_signals({symbol}): {e}")
         return False, None
+
+
+def _evaluate_news_with_claude(symbol, keyword, title, content):
+    """
+    Evalua si una noticia que contiene un keyword negativo es un evento
+    ACTUAL/FUTURO (accionable) o una referencia HISTORICA (ignorar).
+
+    Retorna True si es actual/futuro y debe forzar salida.
+    Retorna False si es historico o si Claude no puede evaluar (conservador).
+    """
+    if not ANTHROPIC_API_KEY:
+        return False
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        prompt = (
+            f"You are evaluating whether a crypto news article requires immediate action.\n\n"
+            f"Token: {symbol}\n"
+            f"Triggered keyword: '{keyword}'\n"
+            f"Article title: {title[:200]}\n"
+            f"Article content: {content[:400]}\n\n"
+            f"Question: Is this article describing a CURRENT or UPCOMING negative event "
+            f"that is happening NOW or will happen SOON (actionable)? "
+            f"Or is it referencing a PAST/HISTORICAL event (not actionable)?\n\n"
+            f"Examples of HISTORICAL (not actionable): 'Back in 2023, the SEC sued...', "
+            f"'Lessons from the 2022 hack...', 'How exchanges recovered after the breach'\n"
+            f"Examples of CURRENT/UPCOMING (actionable): 'SEC just filed charges against...', "
+            f"'Exchange hacked today, funds stolen', 'New ban effective next week'\n\n"
+            f"Respond ONLY with valid JSON:\n"
+            f'{{\"is_current_negative\": true/false, \"reason\": \"one line\"}}'
+        )
+        msg = client.messages.create(
+            model=CLAUDE_MODEL,
+            max_tokens=100,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        raw = msg.content[0].text.strip()
+        start = raw.find("{")
+        end = raw.rfind("}") + 1
+        result = json.loads(raw[start:end])
+        is_current = result.get("is_current_negative", False)
+        reason = result.get("reason", "")
+        log(f"[CLAUDE-NEWS] {symbol} keyword='{keyword}' → {'CURRENT' if is_current else 'HISTORICAL'}: {reason}")
+        return is_current
+    except Exception as e:
+        log(f"[CLAUDE-NEWS] Error evaluando noticia: {e} — defaulting to no-exit")
+        return False
 
 
 def _check_volume_normalized(symbol):

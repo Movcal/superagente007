@@ -55,14 +55,14 @@ def get_available_capital():
     """Consulta el balance real de USDT y descuenta posiciones abiertas y reserva compliance."""
     usdt_total = get_usdt_balance_real()
     if usdt_total <= 0:
-        return 0
+        return 0, 0
     positions = load_positions()
     open_positions = [p for p in positions if p.get("status") == "OPEN"]
     capital_usado = sum(p.get("capital", 0) for p in open_positions)
     reserva_compliance = round(usdt_total * CAPITAL_COMPLIANCE_PCT / 100, 2)
     available = max(0, usdt_total - capital_usado - reserva_compliance)
     log(f"Capital: total=${usdt_total:.2f} | usado=${capital_usado:.2f} | reserva=${reserva_compliance:.2f} | disponible=${available:.2f}")
-    return available
+    return available, usdt_total
 
 
 def calculate_position_size(volume_ratio, sentiment_score, is_priority, symbol=""):
@@ -73,12 +73,11 @@ def calculate_position_size(volume_ratio, sentiment_score, is_priority, symbol="
     - Oportunidad debil  (score <  0.5):  25% del maximo por posicion
     Siempre respeta el capital disponible (descontando posiciones abiertas y reserva compliance).
     """
-    available = get_available_capital()
+    available, usdt_total = get_available_capital()
     if available <= 0:
         return 0
 
-    # Maximo por posicion en dolares (47% del balance USDT real)
-    usdt_total = get_usdt_balance_real()
+    # Maximo por posicion en dolares (47% del balance USDT real) — mismo balance, sin segunda llamada a TWAK
     max_por_posicion = round(usdt_total * CAPITAL_POR_POSICION_PCT / 100, 2)
 
     # Score de oportunidad (0 a 1)

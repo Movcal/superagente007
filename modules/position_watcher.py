@@ -18,10 +18,10 @@ POSITIONS_FILE = "data/open_positions.json"
 WATCHER_LOG    = "logs/position_watcher.log"
 COMPLIANCE_FILE = "data/compliance_trades.json"
 
-# Umbrales de salida
-STOP_LOSS_PCT      = -8.0  # stop loss fijo (antes de que se active el trailing)
-TRAILING_STOP_PCT  = 0.02  # trailing stop: 2% bajo el maximo alcanzado
-TRAILING_ACTIVATION = 0.02 # se activa cuando precio sube 2% desde entrada
+# Umbrales de salida — estrategia semana de competencia
+STOP_LOSS_PCT      = -3.0  # stop loss fijo (antes de que se active el trailing)
+TRAILING_STOP_PCT  = 0.01  # trailing stop: 1% bajo el maximo alcanzado
+TRAILING_ACTIVATION = 0.01 # se activa cuando precio sube 1% desde entrada
 BTC_DROP_ALERT_PCT = -3.0  # salir de alts si BTC cae 3%
 
 # Palabras clave de noticias negativas que fuerzan salida inmediata

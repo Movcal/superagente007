@@ -213,6 +213,39 @@ PRÓXIMA REVISIÓN: [cuándo y qué monitorear]
 
 ---
 
+## MÓDULO 7 — EXPERIENCIA ACUMULADA EN MERCADO REAL
+
+### 7.1 Fear & Greed — usar el DELTA, no el número absoluto
+
+El número de Fear & Greed por sí solo no define si entrar o no. Lo que importa es la **dirección del cambio** entre días consecutivos.
+
+| Delta F&G | Significado | Efecto en decisiones |
+|---|---|---|
+| Ayer 20 → Hoy 18 | El miedo está **creciendo** | No abrir nuevas posiciones. El mercado se está deteriorando activamente. |
+| Ayer 18 → Hoy 19 | El miedo está **disminuyendo** | Señal leve de mejora. Las narrativas fuertes pueden recibir un pequeño boost (+5%). |
+| Delta positivo 3+ días seguidos | Recuperación de sentimiento | Empezar a buscar entradas en narrativas trending up. |
+| Delta negativo 2+ días seguidos | Capitulación activa | Máxima cautela. Esperar estabilización antes de cualquier entrada. |
+
+**Regla:** Siempre comparar el F&G de hoy contra el de ayer antes de tomar cualquier decisión de compra. Si el delta es negativo, reducir el score de confianza de la entrada en 10 puntos.
+
+### 7.2 Mercado en rojo generalizado — patrón del 18 jun 2026
+
+**Condición observada:** Top 100 por MCap con ~80% en rojo en 24h. BTC -2%, BNB -3.2%, F&G 19, dominancia BTC 58.2%.
+
+**Aprendizaje:**
+- Cuando la dominancia de BTC sube Y las alts caen simultáneamente, el capital está rotando HACIA BTC, no hacia ninguna alt. No hay narrativa que aguante eso.
+- Los pocos tokens en verde ese día (+XLM +7%, +H +15%) son outliers con catalizadores propios muy fuertes, no son señal de recuperación del mercado.
+- En este entorno: **no abrir posiciones nuevas**. Esperar que BTC se estabilice primero.
+- Señal de que el entorno mejoró: BTC 1h empieza a subir + dominancia BTC deja de subir o baja + al menos 40% de los top 50 en verde 1h.
+
+### 7.3 ASTER — lección de volatilidad intraday
+
+- ASTER puede caer -12% en 24h después de haber sido uno de los tokens más activos.
+- Los tokens más volátiles del ecosistema BNB (ASTER, KOGE, NFT) se mueven con fuerza pero también caen fuerte.
+- Con la estrategia de trailing stop 1% + stop loss -3%, estos tokens son viables SOLO si la entrada es precisa (narrativa + volumen + TA alineados al momento de entrada).
+
+---
+
 ## REGLAS ESPECÍFICAS PARA EL CONCURSO
 > AVISO PARA FUTURAS SESIONES: Si se vuelve a cargar este archivo, preguntar a Jorge si estas reglas van a las generales o se mantienen como reglas del concurso antes de aplicarlas.
 

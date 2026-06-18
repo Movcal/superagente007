@@ -521,6 +521,90 @@ async def get_costs():
     }
 
 
+@app.get("/api/pnl", dependencies=[Depends(verify_token)])
+async def get_pnl():
+    """PnL por token basado en posiciones cerradas."""
+    positions_file = BASE_DIR / "data" / "open_positions.json"
+    by_token = {}
+
+    if positions_file.exists():
+        try:
+            positions = json.loads(positions_file.read_text(encoding="utf-8"))
+            closed = [p for p in positions if p.get("status") == "CLOSED"]
+            for p in closed:
+                symbol = p.get("symbol", "?")
+                pnl_pct = p.get("pnl_pct")
+                pnl_usd = p.get("pnl_usd")
+                capital = p.get("capital", 0)
+
+                # Si no tiene pnl_pct guardado, intentar calcular desde paper_trades
+                if pnl_pct is None:
+                    paper_file = BASE_DIR / "data" / "paper_trades.json"
+                    if paper_file.exists():
+                        pt = json.loads(paper_file.read_text(encoding="utf-8"))
+                        entry_time = p.get("entry_time", "")[:16]
+                        for t in pt:
+                            if t.get("type") == "SELL" and t.get("symbol") == symbol:
+                                pnl_pct = t.get("pnl_pct")
+                                pnl_usd = t.get("pnl_usd")
+                                break
+
+                if symbol not in by_token:
+                    by_token[symbol] = {
+                        "symbol": symbol,
+                        "trades": 0,
+                        "wins": 0,
+                        "losses": 0,
+                        "total_pnl_pct": 0.0,
+                        "total_pnl_usd": 0.0,
+                        "total_capital": 0.0,
+                    }
+
+                by_token[symbol]["trades"] += 1
+                by_token[symbol]["total_capital"] = round(by_token[symbol]["total_capital"] + capital, 4)
+
+                if pnl_pct is not None:
+                    by_token[symbol]["total_pnl_pct"] = round(by_token[symbol]["total_pnl_pct"] + pnl_pct, 2)
+                    by_token[symbol]["total_pnl_usd"] = round(by_token[symbol]["total_pnl_usd"] + (pnl_usd or 0), 4)
+                    if pnl_pct >= 0:
+                        by_token[symbol]["wins"] += 1
+                    else:
+                        by_token[symbol]["losses"] += 1
+
+        except Exception:
+            pass
+
+    result = []
+    for sym, d in by_token.items():
+        trades = d["trades"]
+        wins   = d["wins"]
+        result.append({
+            "symbol":       sym,
+            "trades":       trades,
+            "wins":         wins,
+            "losses":       d["losses"],
+            "win_rate":     round(wins / trades * 100) if trades else 0,
+            "avg_pnl_pct":  round(d["total_pnl_pct"] / trades, 2) if trades else 0,
+            "total_pnl_usd": d["total_pnl_usd"],
+            "total_capital": d["total_capital"],
+        })
+
+    result.sort(key=lambda x: x["total_pnl_usd"], reverse=True)
+    total_pnl = round(sum(r["total_pnl_usd"] for r in result), 4)
+    total_trades = sum(r["trades"] for r in result)
+    total_wins   = sum(r["wins"] for r in result)
+
+    return {
+        "by_token": result,
+        "summary": {
+            "total_trades":  total_trades,
+            "total_wins":    total_wins,
+            "win_rate":      round(total_wins / total_trades * 100) if total_trades else 0,
+            "total_pnl_usd": total_pnl,
+        }
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8080, reload=True,

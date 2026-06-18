@@ -183,7 +183,7 @@ def paper_sell(position, reason="señal de salida"):
         "paper":       True,
     })
     save_paper_trades(trades)
-    return True
+    return True, exit_price, pnl_usd, pnl_pct
 
 
 def resolve_token(symbol):
@@ -286,11 +286,14 @@ def sell(position, reason="señal de salida"):
 
     log(f"=== {'[PAPER] ' if PAPER_MODE else ''}VENDIENDO {symbol} | Razon: {reason} ===")
 
+    exit_price = None
+    pnl_usd    = None
+    pnl_pct    = None
+
     if PAPER_MODE:
-        ok = paper_sell(position, reason)
+        ok, exit_price, pnl_usd, pnl_pct = paper_sell(position, reason)
     else:
         # Usar 99.9% del balance de tokens para evitar error de balance insuficiente
-        # por diferencias de decimales entre cotizacion y balance real
         tokens = position.get("tokens", 0)
         amount_to_sell = round(tokens * 0.999, 8)
         log(f"Vendiendo {amount_to_sell} {symbol} (99.9% de {tokens})")
@@ -299,16 +302,29 @@ def sell(position, reason="señal de salida"):
             log(f"Swap de venta fallido para {symbol}")
             return False
         ok = True
+        exit_price = get_real_price(symbol)
+        if exit_price:
+            entry_price = position.get("entry_price") or (position["capital"] / tokens if tokens else None)
+            if entry_price:
+                pnl_usd = round(amount_to_sell * exit_price - position["capital"], 4)
+                pnl_pct = round((pnl_usd / position["capital"]) * 100, 2)
 
     if ok:
         positions = load_positions()
         for p in positions:
             if p["symbol"] == symbol and p["status"] == "OPEN":
-                p["status"] = "CLOSED"
+                p["status"]    = "CLOSED"
                 p["exit_time"] = datetime.utcnow().isoformat()
                 p["exit_reason"] = reason
+                if exit_price is not None:
+                    p["exit_price"] = exit_price
+                if pnl_usd is not None:
+                    p["pnl_usd"] = pnl_usd
+                if pnl_pct is not None:
+                    p["pnl_pct"] = pnl_pct
         save_positions(positions)
-        log(f"POSICION CERRADA: {symbol} | Razon: {reason}")
+        pnl_str = f" | PnL: ${pnl_usd} ({pnl_pct:+.2f}%)" if pnl_pct is not None else ""
+        log(f"POSICION CERRADA: {symbol} | Razon: {reason}{pnl_str}")
 
     return ok
 

@@ -313,43 +313,43 @@ async def get_market():
             # Interpretacion del agente — BTC dominance
             if btc_dom >= 60:
                 btc_text = (
-                    f"BTC controla el {btc_dom}% del mercado. Modo defensivo activo: "
-                    "los inversores prefieren Bitcoin sobre las altcoins. "
-                    "Las alts suelen tener movimientos más limitados en este contexto."
+                    f"BTC controls {btc_dom}% of the market. Active defensive mode: "
+                    "investors are favoring Bitcoin over altcoins. "
+                    "Alts tend to have more limited moves in this context."
                 )
             elif btc_dom >= 50:
                 btc_text = (
-                    f"Dominancia de BTC en zona media ({btc_dom}%). Hay rotación gradual "
-                    "hacia altcoins. Oportunidades en tokens con catalizadores propios como "
-                    "los del ecosistema BNB."
+                    f"BTC dominance in mid range ({btc_dom}%). Gradual rotation "
+                    "toward altcoins underway. Opportunities in tokens with their own "
+                    "catalysts, such as BNB ecosystem projects."
                 )
             else:
                 btc_text = (
-                    f"BTC dominancia baja ({btc_dom}%): temporada de altcoins activa. "
-                    "El capital fluye hacia proyectos más pequeños — mayor potencial "
-                    "de ganancia, pero también mayor volatilidad."
+                    f"Low BTC dominance ({btc_dom}%): active altcoin season. "
+                    "Capital is flowing into smaller projects — higher upside "
+                    "potential, but also higher volatility."
                 )
 
-            # Interpretacion — stablecoins
+            # Agent interpretation — stablecoins
             if stable_dom > 12:
                 stable_text = (
-                    f"Las stablecoins representan el {stable_dom}% del mercado total — "
-                    "nivel ALTO. Señal de cautela: muchos inversores están refugiados "
-                    "esperando el momento para entrar al mercado."
+                    f"Stablecoins represent {stable_dom}% of the total market — "
+                    "HIGH level. Caution signal: many investors are sheltered "
+                    "waiting for the right moment to enter the market."
                 )
-                divergence = "REFUGIO"
+                divergence = "SHELTER"
             elif stable_dom < 7:
                 stable_text = (
-                    f"Las stablecoins representan solo el {stable_dom}% del mercado — "
-                    "nivel BAJO. El dinero está rotando activamente hacia proyectos cripto. "
-                    "Señal positiva para el mercado en general."
+                    f"Stablecoins represent only {stable_dom}% of the market — "
+                    "LOW level. Capital is actively rotating into crypto projects. "
+                    "Positive signal for the market overall."
                 )
-                divergence = "ROTACION"
+                divergence = "ROTATION"
             else:
                 stable_text = (
-                    f"Las stablecoins representan el {stable_dom}% del mercado — "
-                    "nivel NEUTRAL. Sin movimientos masivos hacia o desde stablecoins. "
-                    "El mercado está en equilibrio."
+                    f"Stablecoins represent {stable_dom}% of the market — "
+                    "NEUTRAL level. No major flows in or out of stablecoins. "
+                    "The market is in equilibrium."
                 )
                 divergence = "NEUTRAL"
 

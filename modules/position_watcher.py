@@ -101,8 +101,8 @@ def check_mcp_exit_signals(symbol):
         if news_data:
             rows = news_data.get("rows", [])
             for row in rows[:5]:
-                title   = (row[0] if len(row) > 0 else "")
-                content = (row[1] if len(row) > 1 else "")
+                title   = (row[0] or "") if len(row) > 0 else ""
+                content = (row[1] or "") if len(row) > 1 else ""
                 combined = (title + " " + content).lower()
                 for kw in NEWS_EXIT_KEYWORDS:
                     if re.search(r'\b' + re.escape(kw) + r'\b', combined):

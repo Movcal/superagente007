@@ -255,9 +255,26 @@ def buy(decision):
         log(f"Swap fallido para {symbol}")
         return None
 
+    # Extraer cantidad de tokens y precio de entrada del resultado del swap
+    tokens_bought = 0
+    entry_price = None
+    output_str = swap_result.get("output", "") if isinstance(swap_result, dict) else ""
+    if output_str:
+        try:
+            tokens_bought = float(output_str.split()[0])
+            if tokens_bought > 0:
+                entry_price = round(capital / tokens_bought, 8)
+        except (ValueError, IndexError):
+            log(f"No se pudo parsear tokens del output: {output_str!r}")
+
+    if tokens_bought == 0:
+        log(f"ADVERTENCIA: no se pudieron extraer tokens del swap_result de {symbol}. La venta futura puede fallar.")
+
     position = {
         "symbol": symbol,
         "capital": capital,
+        "entry_price": entry_price,
+        "tokens": tokens_bought,
         "entry_time": decision["entry_time"],
         "hold_min_hours": decision["hold_min_hours"],
         "hold_max_hours": decision["hold_max_hours"],
@@ -295,6 +312,16 @@ def sell(position, reason="señal de salida"):
     else:
         # Usar 99.9% del balance de tokens para evitar error de balance insuficiente
         tokens = position.get("tokens", 0)
+        if not tokens or tokens <= 0:
+            log(f"ERROR: posicion de {symbol} no tiene campo 'tokens' valido ({tokens}). Cerrando posicion sin swap para detener el loop.")
+            positions = load_positions()
+            for p in positions:
+                if p["symbol"] == symbol and p["status"] == "OPEN":
+                    p["status"] = "CLOSED"
+                    p["exit_time"] = datetime.utcnow().isoformat()
+                    p["exit_reason"] = f"ERROR: tokens=0, venta no ejecutada — {reason}"
+            save_positions(positions)
+            return False
         amount_to_sell = round(tokens * 0.999, 8)
         log(f"Vendiendo {amount_to_sell} {symbol} (99.9% de {tokens})")
         swap_result = execute_swap(symbol, BASE_TOKEN, amount_to_sell)

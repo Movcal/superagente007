@@ -16,7 +16,6 @@ HISTORY_FILE = "data/volume_history.json"
 # Tokens con liquidez verificada en PancakeSwap BSC (>$10k)
 # Investigacion completa: 2026-06-16 | Script: investigate_liquidity.py
 # De 149 permitidos en el hackathon, 86 tienen pool activa con liquidez suficiente
-# Excluidos: stablecoins (23), baja liquidez <$10k (28), sin par PancakeSwap (10), sin contrato BSC (1)
 TOKENS = [
     "ETH","XRP","TRX","DOGE","ZEC","ADA","LINK","BCH","TON","LTC",
     "AVAX","SHIB","WLFI","DOT","UNI","ASTER","DEXE","ETC","AAVE","ATOM",
@@ -29,49 +28,177 @@ TOKENS = [
     "BDCA","BNB","Q","FF","B","BabyDoge",
 ]
 
-# Stablecoins y tokens de precio fijo — excluir del escaner de volumen
-# (nunca tendran sentimiento positivo para trading)
 STABLECOINS = {
     "USDT","USDC","DAI","BUSD","TUSD","FDUSD","FRAX","FRXUSD","USDD","USD1",
     "USDe","USDf","USDF","DUSD","XUSD","EURI","lisUSD","STABLE","XAUM","XAUt",
     "SMILEK","GUA","M","U"
 }
 
-# Tokens prioritarios del ecosistema BNB (watchlist especial)
 PRIORITY_TOKENS = ["BNB", "CAKE", "ASTER", "FLOKI"]
 
+# Mapa de fuentes de datos por vela de 5min.
+# Verificado: 2026-06-19 contra APIs de Gate.io, KuCoin, MEXC.
+# Gate.io es la fuente principal (no bloqueada desde DigitalOcean VPS).
+# Formato: symbol -> (exchange, symbol_en_exchange)
+EXCHANGE_SOURCE = {
+    # Gate.io con simbolo diferente al nuestro
+    "TON":      ("gate",    "GRAM"),
+    "BabyDoge": ("gate",    "BABYDOGE"),
+    # MEXC — unica fuente disponible para estos 3
+    "BSB":      ("mexc",    "BSB"),
+    "RIVER":    ("mexc",    "RIVER"),
+    "BDCA":     ("mexc",    "BDCA"),
+    # KuCoin
+    "TAC":      ("kucoin",  "TAC"),
+    # CMC 24h fallback — sin par en CEX accesible desde VPS
+    "DUCKY":    ("cmc",     "DUCKY"),
+    "KOGE":     ("cmc",     "KOGE"),
+}
+# Todos los demas van a Gate.io con su simbolo normal
 
-def get_cmc_headers():
-    return {"X-CMC_PRO_API_KEY": CMC_API_KEY}
+
+def log(msg):
+    timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+    line = f"[{timestamp}] {msg}"
+    print(line)
+    with open("logs/volume_monitor.log", "a") as f:
+        f.write(line + "\n")
 
 
-def fetch_volumes(symbols):
-    """Consulta CMC y devuelve volumen 24h por simbolo."""
-    url = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest"
-    # CMC acepta hasta 100 simbolos por llamada, dividimos en lotes
+# ── Fuentes de velas por exchange ─────────────────────────────────────────────
+
+def fetch_gate_candle(gate_symbol):
+    """Ultima vela completada de 5min de Gate.io.
+    Retorna (vol_usdt, open, close) o None.
+    Gate formato: [timestamp, vol_quote, close, high, low, open, vol_base]
+    """
+    try:
+        r = requests.get(
+            "https://api.gateio.ws/api/v4/spot/candlesticks",
+            params={"currency_pair": f"{gate_symbol}_USDT", "interval": "5m", "limit": "3"},
+            timeout=10
+        )
+        if r.status_code == 200:
+            data = r.json()
+            if len(data) >= 2:
+                c = data[-2]  # -1 es la vela formandose, -2 es la ultima completada
+                return float(c[1]), float(c[5]), float(c[2])  # vol_usdt, open, close
+    except Exception as e:
+        log(f"Error Gate.io {gate_symbol}: {e}")
+    return None
+
+
+def fetch_mexc_candle(symbol):
+    """Ultima vela completada de 5min de MEXC.
+    MEXC formato: [timestamp, open, high, low, close, vol_base, ...]
+    """
+    try:
+        r = requests.get(
+            "https://api.mexc.com/api/v3/klines",
+            params={"symbol": f"{symbol}USDT", "interval": "5m", "limit": "3"},
+            timeout=10
+        )
+        if r.status_code == 200:
+            data = r.json()
+            if len(data) >= 2:
+                c = data[-2]
+                open_  = float(c[1])
+                close  = float(c[4])
+                vol_base = float(c[5])
+                vol_usdt = vol_base * close  # aproximacion en USDT
+                return vol_usdt, open_, close
+    except Exception as e:
+        log(f"Error MEXC {symbol}: {e}")
+    return None
+
+
+def fetch_kucoin_candle(symbol):
+    """Ultima vela completada de 5min de KuCoin.
+    KuCoin formato (descendente): [timestamp, open, close, high, low, vol_base, turnover_usdt]
+    """
+    try:
+        r = requests.get(
+            "https://api.kucoin.com/api/v1/market/candles",
+            params={"type": "5min", "symbol": f"{symbol}-USDT"},
+            timeout=10
+        )
+        if r.status_code == 200:
+            data = r.json().get("data", [])
+            if len(data) >= 2:
+                c = data[1]  # KuCoin retorna descendente, index 1 = ultima completada
+                open_    = float(c[1])
+                close    = float(c[2])
+                vol_usdt = float(c[6])  # turnover en USDT
+                return vol_usdt, open_, close
+    except Exception as e:
+        log(f"Error KuCoin {symbol}: {e}")
+    return None
+
+
+def fetch_cmc_volumes(symbols):
+    """Fallback CMC 24h para tokens sin par en CEX. Retorna {symbol: vol_24h}."""
     results = {}
-    batch_size = 90
-    for i in range(0, len(symbols), batch_size):
-        batch = symbols[i:i + batch_size]
-        try:
-            r = requests.get(
-                url,
-                headers=get_cmc_headers(),
-                params={"symbol": ",".join(batch), "convert": "USD"},
-                timeout=15
-            )
-            if r.status_code == 200:
-                data = r.json().get("data", {})
-                for symbol, info in data.items():
-                    if isinstance(info, list):
-                        info = info[0]
-                    vol = info.get("quote", {}).get("USD", {}).get("volume_24h", 0)
-                    results[symbol] = vol
-        except Exception as e:
-            log(f"Error consultando CMC: {e}")
-        time.sleep(0.5)
+    try:
+        r = requests.get(
+            "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest",
+            headers={"X-CMC_PRO_API_KEY": CMC_API_KEY},
+            params={"symbol": ",".join(symbols), "convert": "USD"},
+            timeout=15
+        )
+        if r.status_code == 200:
+            data = r.json().get("data", {})
+            for symbol, info in data.items():
+                if isinstance(info, list):
+                    info = info[0]
+                vol = info.get("quote", {}).get("USD", {}).get("volume_24h", 0)
+                results[symbol] = vol
+    except Exception as e:
+        log(f"Error CMC fallback: {e}")
     return results
 
+
+def fetch_candle_for_token(symbol):
+    """Obtiene (vol_usdt, open, close) de la ultima vela completada segun la fuente configurada."""
+    source_info = EXCHANGE_SOURCE.get(symbol)
+    if source_info:
+        exchange, ex_symbol = source_info
+        if exchange == "gate":
+            return fetch_gate_candle(ex_symbol)
+        elif exchange == "mexc":
+            return fetch_mexc_candle(ex_symbol)
+        elif exchange == "kucoin":
+            return fetch_kucoin_candle(ex_symbol)
+        elif exchange == "cmc":
+            return None  # se maneja en lote aparte
+    else:
+        return fetch_gate_candle(symbol)  # Gate con simbolo normal
+
+
+def fetch_all_volumes():
+    """Trae volumen de todos los tokens. Retorna {symbol: (vol_usdt, open, close)}."""
+    results = {}
+    cmc_fallback = [s for s in TOKENS if EXCHANGE_SOURCE.get(s, ("gate",))[0] == "cmc"]
+
+    for symbol in TOKENS:
+        if symbol in STABLECOINS:
+            continue
+        if symbol in cmc_fallback:
+            continue
+        candle = fetch_candle_for_token(symbol)
+        if candle:
+            results[symbol] = candle
+        time.sleep(0.12)  # ~8 req/s, dentro del limite de Gate.io
+
+    # CMC fallback en lote
+    if cmc_fallback:
+        cmc_vols = fetch_cmc_volumes(cmc_fallback)
+        for sym, vol in cmc_vols.items():
+            results[sym] = (vol, 0, 0)  # sin OHLC
+
+    return results
+
+
+# ── Historia y alertas ────────────────────────────────────────────────────────
 
 def load_history():
     if os.path.exists(HISTORY_FILE):
@@ -97,25 +224,16 @@ def save_alert(alert):
     alerts.append(alert)
     with open(ALERTS_FILE, "w") as f:
         json.dump(alerts, f, indent=2)
-    log(f"ALERTA GUARDADA: {alert['symbol']} - {alert['ratio']:.1f}x volumen")
-
-
-def log(msg):
-    timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
-    line = f"[{timestamp}] {msg}"
-    print(line)
-    with open("logs/volume_monitor.log", "a") as f:
-        f.write(line + "\n")
+    log(f"ALERTA GUARDADA: {alert['symbol']} - {alert['ratio']:.1f}x volumen | precio {alert['price_change_pct']:+.2f}%")
 
 
 def load_watchlist_thresholds():
-    """Lee watchlist.json y retorna {symbol: threshold} con 2x o 3x."""
-    watchlist_file = "data/watchlist.json"
+    """Lee watchlist.json y retorna {symbol: threshold}."""
     thresholds = {}
-    if not os.path.exists(watchlist_file):
+    if not os.path.exists("data/watchlist.json"):
         return thresholds
     try:
-        with open(watchlist_file, "r") as f:
+        with open("data/watchlist.json", "r") as f:
             watchlist = json.load(f)
         for symbol, entry in watchlist.items():
             days = entry.get("days_in_watchlist", 0)
@@ -125,43 +243,48 @@ def load_watchlist_thresholds():
     return thresholds
 
 
-def check_volume_spikes(current_volumes, history):
-    """Compara volumen actual con promedio historico. Devuelve alertas."""
+def check_volume_spikes(candle_data, history):
+    """Compara volumen de la vela actual contra baseline de 24 velas (2 horas).
+    Solo genera alerta si el precio tambien subio (confirmacion de direccion).
+    """
     watchlist_thresholds = load_watchlist_thresholds()
     alerts = []
 
-    for symbol, current_vol in current_volumes.items():
+    for symbol, (current_vol, open_, close) in candle_data.items():
         if current_vol == 0:
-            continue
-        if symbol in STABLECOINS:
             continue
 
         past_readings = history.get(symbol, [])
-
-        # Necesitamos al menos 3 lecturas para calcular promedio
-        if len(past_readings) < 3:
+        if len(past_readings) < 6:
             continue
 
-        avg_vol = sum(past_readings[-6:]) / len(past_readings[-6:])  # promedio ultimas 6 lecturas (30 min)
-        if avg_vol == 0:
+        baseline_readings = past_readings[-24:] if len(past_readings) >= 24 else past_readings
+        baseline = sum(baseline_readings) / len(baseline_readings)
+        if baseline == 0:
             continue
 
-        ratio = current_vol / avg_vol
+        ratio = current_vol / baseline
         is_priority = symbol in PRIORITY_TOKENS
-
-        # Threshold dinamico: 2x (watchlist 3+ dias), 3x (watchlist), 5x (sin narrativa)
         threshold = watchlist_thresholds.get(symbol, VOLUMEN_THRESHOLD)
 
-        if ratio >= threshold:
+        # Confirmacion de direccion: precio subio con el volumen
+        # Para CMC fallback (open=0) se omite este filtro
+        price_up = (close > open_) if open_ > 0 else True
+        price_change_pct = round((close - open_) / open_ * 100, 2) if open_ > 0 else 0
+
+        if ratio >= threshold and price_up:
             alert = {
-                "symbol":         symbol,
-                "ratio":          round(ratio, 2),
-                "current_volume": current_vol,
-                "avg_volume":     avg_vol,
-                "timestamp":      datetime.utcnow().isoformat(),
-                "priority":       is_priority,
-                "threshold_used": threshold,
-                "in_watchlist":   symbol in watchlist_thresholds,
+                "symbol":           symbol,
+                "ratio":            round(ratio, 2),
+                "current_volume":   current_vol,
+                "avg_volume":       baseline,
+                "open":             open_,
+                "close":            close,
+                "price_change_pct": price_change_pct,
+                "timestamp":        datetime.utcnow().isoformat(),
+                "priority":         is_priority,
+                "threshold_used":   threshold,
+                "in_watchlist":     symbol in watchlist_thresholds,
             }
             alerts.append(alert)
             save_alert(alert)
@@ -169,32 +292,34 @@ def check_volume_spikes(current_volumes, history):
     return alerts
 
 
-def update_history(history, current_volumes):
-    """Agrega la lectura actual al historial. Mantiene las ultimas 24 lecturas (2 horas)."""
-    for symbol, vol in current_volumes.items():
+def update_history(history, candle_data):
+    """Agrega volumen actual al historial. Mantiene las ultimas 48 lecturas (4 horas)."""
+    for symbol, (vol, open_, close) in candle_data.items():
         if symbol not in history:
             history[symbol] = []
         history[symbol].append(vol)
-        history[symbol] = history[symbol][-24:]  # max 24 lecturas
+        history[symbol] = history[symbol][-48:]
     return history
 
 
+# ── Loop principal ────────────────────────────────────────────────────────────
+
 def run_once():
     """Ejecuta una sola revision de volumenes. Retorna lista de alertas."""
-    log("Revisando volumenes...")
+    log("Revisando volumenes por vela 5min...")
     history = load_history()
-    current_volumes = fetch_volumes(TOKENS)
-    log(f"Tokens consultados: {len(current_volumes)}")
+    candle_data = fetch_all_volumes()
+    log(f"Tokens consultados: {len(candle_data)}")
 
-    alerts = check_volume_spikes(current_volumes, history)
-    history = update_history(history, current_volumes)
+    alerts = check_volume_spikes(candle_data, history)
+    history = update_history(history, candle_data)
     save_history(history)
 
     if alerts:
         log(f"SPIKES DETECTADOS: {len(alerts)} token(s)")
         for a in alerts:
             priority_tag = " [PRIORITARIO]" if a["priority"] else ""
-            log(f"  -> {a['symbol']}: {a['ratio']}x volumen{priority_tag}")
+            log(f"  -> {a['symbol']}: {a['ratio']:.1f}x volumen | precio {a['price_change_pct']:+.2f}%{priority_tag}")
     else:
         log("Sin spikes detectados.")
 
@@ -203,7 +328,7 @@ def run_once():
 
 def run_loop():
     """Loop principal: revisa cada 5 minutos."""
-    log("=== Monitor de Volumen iniciado ===")
+    log("=== Monitor de Volumen iniciado (velas 5min) ===")
     log(f"Threshold: {VOLUMEN_THRESHOLD}x | Intervalo: {VOLUMEN_TIMEFRAME_MIN} min")
     while True:
         try:

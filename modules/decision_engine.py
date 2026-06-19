@@ -208,20 +208,7 @@ def evaluate(volume_alert, path="B"):
         log(f"Maximo de posiciones alcanzado ({MAX_POSICIONES}), ignorando {symbol}")
         return None
 
-    # Analizar sentimiento (se pasa volume_ratio para que el spike sea señal anticipada)
-    sentiment = analyze_sentiment(symbol, volume_ratio=volume_ratio)
-
-    # REGLA PRINCIPAL: doble confirmacion obligatoria
-    # Volumen confirmado (ya lo tenemos por la alerta)
-    # Sentimiento debe ser POSITIVO — excepto en breaking news BULLISH_ALTO
-    is_breaking = volume_alert.get("breaking_news", False)
-    if sentiment["sentiment"] != "POSITIVO" and not is_breaking:
-        log(f"{symbol} rechazado: sentimiento {sentiment['sentiment']}, se necesita POSITIVO")
-        return None
-    if is_breaking and sentiment["sentiment"] != "POSITIVO":
-        log(f"{symbol} [BREAKING] override de sentimiento: noticia alto impacto, entrando aunque precio aun no confirma")
-
-    # Verificar si el token esta en watchlist y tiene TA precalculado
+    # ── Verificar si el token esta en watchlist ───────────────────────────────
     token_ta = get_token_ta(symbol)
     in_watchlist = token_ta is not None
 
@@ -229,16 +216,36 @@ def evaluate(volume_alert, path="B"):
         ta_rating = token_ta.get("ta_rating", "wait")
         ta_summary = token_ta.get("ta_summary", "")
         days_in_watchlist = token_ta.get("days_in_watchlist", 0)
-        log(f"{symbol} en watchlist ({days_in_watchlist} dias) | TA: {ta_rating} | {ta_summary}")
-        # Si el TA dice avoid, Claude igual decide (puede detectar suelo)
-        if ta_rating == "avoid":
-            log(f"{symbol} TA=avoid — Claude evaluara con contexto completo si hay oportunidad")
+        log(f"{symbol} en watchlist ({days_in_watchlist} dias) | TA previo: {ta_rating} | {ta_summary}")
     else:
-        # Token sin narrativa: Claude investiga la causa del spike
         ta_summary = "Token sin narrativa previa — spike sin respaldo de noticias acumuladas"
-        log(f"{symbol} no esta en watchlist — Claude investigara causa del spike {volume_ratio}x")
+        ta_rating = "wait"
 
-    # Confirmacion narrativa pre-spike: el volumen confirma lo que las noticias ya anunciaban
+    # ── PATH WATCHLIST (A): precio subio + volumen = entrada inmediata ────────
+    # El TA ya fue validado cuando se agrego a watchlist (RSI, MACD, momentum)
+    # En el momento del spike el TA esta contaminado por la suba rapida — no lo usamos como filtro
+    if in_watchlist:
+        price_change_pct = volume_alert.get("price_change_pct", 0)
+        if price_change_pct <= 0:
+            log(f"{symbol} [WATCHLIST] rechazado: precio no subio con el volumen ({price_change_pct:+.2f}%)")
+            return None
+        log(f"{symbol} [WATCHLIST] precio subio {price_change_pct:+.2f}% con volumen {volume_ratio}x — entrada directa")
+        # Sentimiento solo para sizing (no bloquea la decision)
+        sentiment = analyze_sentiment(symbol, volume_ratio=volume_ratio)
+        ta_summary_for_claude = ta_summary  # TA pre-spike, informativo
+
+    # ── PATH SPIKE SIN NARRATIVA (B): requiere doble confirmacion clasica ────
+    else:
+        sentiment = analyze_sentiment(symbol, volume_ratio=volume_ratio)
+        is_breaking = volume_alert.get("breaking_news", False)
+        if sentiment["sentiment"] != "POSITIVO" and not is_breaking:
+            log(f"{symbol} rechazado: sentimiento {sentiment['sentiment']}, se necesita POSITIVO")
+            return None
+        if is_breaking and sentiment["sentiment"] != "POSITIVO":
+            log(f"{symbol} [BREAKING] override de sentimiento: noticia alto impacto, entrando aunque precio aun no confirma")
+        ta_summary_for_claude = ta_summary
+
+    # Confirmacion narrativa: el volumen confirma lo que las noticias ya anunciaban
     narrative_conf = get_narrative_confirmation(symbol)
     if narrative_conf["confirmed"]:
         log(f"{symbol} DOBLE CONFIRMACION: volumen {volume_ratio}x + narrativa {narrative_conf['strength'].upper()} "
@@ -247,16 +254,21 @@ def evaluate(volume_alert, path="B"):
         log(f"{symbol} narrativa: {narrative_conf['strength']} ({narrative_conf['bull_score']}% bullish) — "
             f"spike sin respaldo previo de noticias")
 
-    # Analisis de noticias y KOLs via Claude (recibe TA + contexto watchlist)
-    # Si CLAUDE_ENABLED=false -> market_bias=None y este bloque no hace nada
-    market_bias = get_market_bias(symbol, extra_context={"ta_analysis": ta_summary, "in_watchlist": in_watchlist})
-    if market_bias:
-        if market_bias["action_modifier"] == "SKIP":
-            log(f"{symbol} rechazado por Claude: {market_bias['reason']}")
-            return None
-        if market_bias["action_modifier"] == "REDUCE_SIZE":
-            log(f"{symbol} capital reducido por Claude: {market_bias['reason']}")
-            # Se aplica el 50% de reduccion despues de calculate_position_size
+    # Analisis Claude:
+    # - PATH B (sin watchlist): ANTES de entrar — puede bloquear la operacion
+    # - PATH A (watchlist): NO bloquea — Claude documenta el catalizador post-decision
+    market_bias = None
+    if not in_watchlist:
+        market_bias = get_market_bias(symbol, extra_context={"ta_analysis": ta_summary_for_claude, "in_watchlist": False})
+        if market_bias:
+            if market_bias["action_modifier"] == "SKIP":
+                log(f"{symbol} rechazado por Claude: {market_bias['reason']}")
+                return None
+            if market_bias["action_modifier"] == "REDUCE_SIZE":
+                log(f"{symbol} capital reducido por Claude: {market_bias['reason']}")
+                # Se aplica el 50% de reduccion despues de calculate_position_size
+    else:
+        log(f"{symbol} [WATCHLIST] Claude documentara el catalizador post-entrada (no bloquea decision)")
 
     # Calcular capital
     capital = calculate_position_size(volume_ratio, sentiment["score"], sentiment["is_priority"], symbol)
@@ -292,8 +304,9 @@ def evaluate(volume_alert, path="B"):
         "sentiment_score": sentiment["score"],
         "narrative": sentiment["narrative"],
         "is_priority": sentiment["is_priority"],
+        "in_watchlist": in_watchlist,
         "reasoning": reasoning,
-        "path": path
+        "path": "A" if in_watchlist else path
     }
 
     log(f"DECISION: COMPRAR {symbol} con ${capital} | Hold: {hold_min}-{hold_max}h")

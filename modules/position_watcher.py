@@ -313,6 +313,10 @@ def check_exit_conditions(position, current_price, btc_change):
     """
     symbol = position["symbol"]
 
+    # 0. Posicion de recuperacion automatica — vender inmediatamente
+    if position.get("recovery"):
+        return True, "recuperacion automatica: token huerfano encontrado en wallet, convirtiendo a USDT", position
+
     # 1. BTC cayo mas del 3% (macro negativa)
     if btc_change <= BTC_DROP_ALERT_PCT:
         return True, f"BTC cayo {btc_change:.2f}% (proteccion macro)", position

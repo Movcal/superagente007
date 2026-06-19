@@ -7,7 +7,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent))
 
 from modules.volume_monitor import run_once as check_volumes
 from modules.decision_engine import evaluate as evaluate_decision
-from modules.trade_executor import buy
+from modules.trade_executor import buy, compliance_trade
 from modules.position_watcher import run_once as check_positions
 from modules.reconcile import reconcile
 from modules.market_intelligence import (
@@ -18,6 +18,30 @@ from modules.technical_screener import screen_watchlist
 
 LOOP_INTERVAL_SEC = 300  # 5 minutos
 NEWS_SCAN_EVERY_N_CYCLES = 6  # escanea noticias cada ~30 min (6 x 5 min)
+
+# Ventana de compliance trade: 22:00-23:00 UTC
+COMPLIANCE_HOUR_START = 22
+COMPLIANCE_HOUR_END   = 23
+
+_compliance_done_today = None  # fecha UTC en que se ejecuto el compliance trade
+
+
+def had_real_trade_today():
+    """Retorna True si ya hubo al menos un trade real (no compliance) en el dia UTC de hoy."""
+    import json, os
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    positions_file = "data/open_positions.json"
+    if not os.path.exists(positions_file):
+        return False
+    with open(positions_file) as f:
+        positions = json.load(f)
+    for p in positions:
+        if p.get("reasoning", "").startswith("Trade de cumplimiento"):
+            continue
+        entry = p.get("entry_time", "")
+        if entry.startswith(today):
+            return True
+    return False
 
 
 def log(msg):
@@ -151,6 +175,27 @@ def main():
                 generate_daily_summary()
         except Exception as e:
             log(f"Error en generate_daily_summary: {e}")
+
+        # Compliance trade: 22:00-23:00 UTC si no hubo ningún trade real hoy
+        try:
+            global _compliance_done_today
+            now = datetime.utcnow()
+            today = now.strftime("%Y-%m-%d")
+            if (COMPLIANCE_HOUR_START <= now.hour < COMPLIANCE_HOUR_END
+                    and _compliance_done_today != today):
+                if had_real_trade_today():
+                    log("[COMPLIANCE] Ya hubo trade real hoy, no se necesita compliance trade.")
+                    _compliance_done_today = today
+                else:
+                    log("[COMPLIANCE] Sin trades reales hoy — ejecutando compliance trade (22:00 UTC)...")
+                    ok = compliance_trade()
+                    if ok:
+                        log("[COMPLIANCE] Compliance trade ejecutado exitosamente.")
+                    else:
+                        log("[COMPLIANCE] Compliance trade fallo.")
+                    _compliance_done_today = today  # no reintentar en este ciclo de la hora
+        except Exception as e:
+            log(f"Error en compliance trade check: {e}")
 
         log(f"Proximo ciclo en {LOOP_INTERVAL_SEC // 60} minutos...")
         time.sleep(LOOP_INTERVAL_SEC)

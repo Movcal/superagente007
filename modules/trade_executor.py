@@ -406,17 +406,12 @@ def compliance_trade():
     # Vender inmediatamente — esperar confirmacion del swap de compra
     time.sleep(10)
 
-    # En modo real, obtener el balance actual de CAKE para vender
-    if not PAPER_MODE:
-        from modules.reconcile import get_token_balance_twak
-        cake_contract = get_contract("CAKE")
-        cake_balance = get_token_balance_twak(cake_contract) if cake_contract else 0
-        if cake_balance and cake_balance > 0:
-            position["tokens"] = cake_balance
-            log(f"Balance CAKE para venta: {cake_balance}")
-        else:
-            log("Compliance trade: no se pudo obtener balance de CAKE para vender")
-            return False
+    # Los tokens ya vienen correctamente del buy() que parsea swap_result.output
+    tokens = position.get("tokens", 0)
+    if not tokens or tokens <= 0:
+        log("Compliance trade: buy() no retorno tokens validos, abortando")
+        return False
+    log(f"Vendiendo {tokens} CAKE (del swap de compra)")
 
     result = sell(position, reason="compliance trade - venta inmediata")
     return result

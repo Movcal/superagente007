@@ -132,99 +132,75 @@ def _log_position_context(position, balance_real=None):
     log(f"    Estado  : position_watcher retoma monitoreo automaticamente")
 
 
-def get_wallet_portfolio():
+def get_recently_traded_symbols(hours=48):
     """
-    Llama a 'twak wallet portfolio --chains bsc --json' y retorna lista de tokens
-    con balance > 0 que no son stables ni BNB.
-    Formato retornado: [{symbol, contract, balance, usd_value}, ...]
+    Retorna lista de simbolos que aparecen en posiciones CLOSED en las ultimas N horas.
+    Estos son los candidatos a tener balance residual si algo fallo al vender.
     """
-    twak_exe = shutil.which("twak")
-    if not twak_exe:
-        log("twak no encontrado en PATH, no se puede obtener portfolio")
-        return []
-
-    env = os.environ.copy()
-    if WALLET_PASSWORD:
-        env["TWAK_WALLET_PASSWORD"] = WALLET_PASSWORD
-
-    cmd = [twak_exe, "wallet", "portfolio", "--chains", "bsc", "--json"]
+    symbols = set()
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60, env=env)
-        stdout = result.stdout.strip()
-        if not stdout:
-            return []
-        # TWAK puede mezclar JSON con stderr — extraer solo el JSON
-        start = stdout.find("[")
-        end   = stdout.rfind("]") + 1
-        if start == -1 or end == 0:
-            return []
-        data = json.loads(stdout[start:end])
-        tokens = []
-        for item in data:
-            symbol  = item.get("symbol", "")
-            balance = float(item.get("balance", 0) or 0)
-            usd     = float(item.get("usdValue", 0) or 0)
-            contract = (item.get("contract") or "").lower()
-            if symbol in SKIP_SYMBOLS or balance <= 0:
+        positions = load_positions()
+        cutoff = datetime.utcnow()
+        for p in positions:
+            if p.get("status") != "CLOSED":
                 continue
-            tokens.append({
-                "symbol":    symbol,
-                "contract":  contract,
-                "balance":   balance,
-                "usd_value": usd,
-            })
-        return tokens
-    except Exception as e:
-        log(f"Error obteniendo portfolio: {e}")
-        return []
+            exit_time = p.get("exit_time") or p.get("entry_time", "")
+            try:
+                t = datetime.fromisoformat(exit_time.replace("Z", ""))
+                hours_ago = (cutoff - t).total_seconds() / 3600
+                if hours_ago <= hours:
+                    sym = p.get("symbol", "")
+                    if sym and sym not in SKIP_SYMBOLS:
+                        symbols.add(sym)
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return list(symbols)
 
 
 def recover_orphan_tokens(open_positions):
     """
-    Compara el portfolio real de la wallet contra las posiciones OPEN del JSON.
-    Si hay tokens en la wallet sin posicion OPEN registrada, crea una posicion
-    de recuperacion para que position_watcher pueda venderlos.
-    Retorna lista de posiciones de recuperacion creadas (puede ser vacia).
+    Busca tokens huerfanos verificando balance on-chain de tokens comprados recientemente.
+    Solo consulta tokens que aparecen en posiciones CLOSED de las ultimas 48h.
+    Solo actua sobre tokens con contrato verificado en nuestro registry.
+    Retorna lista de posiciones de recuperacion creadas.
     """
-    portfolio = get_wallet_portfolio()
-    if not portfolio:
-        log("Portfolio vacio o no disponible — sin deteccion de tokens huerfanos")
+    open_symbols = {p["symbol"] for p in open_positions}
+    candidates = get_recently_traded_symbols(hours=48)
+
+    if not candidates:
+        log("Sin trades recientes para verificar.")
         return []
 
-    open_symbols = {p["symbol"] for p in open_positions}
+    log(f"Verificando balance on-chain de {len(candidates)} token(s) recientes: {candidates}")
     recovered = []
 
-    for item in portfolio:
-        symbol           = item["symbol"]
-        balance          = item["balance"]
-        usd              = item["usd_value"]
-        contract_wallet  = (item.get("contract") or "").lower()
-
+    for symbol in candidates:
         if symbol in open_symbols:
-            continue  # ya tiene posicion OPEN, el reconcile normal lo maneja
+            continue  # ya tiene posicion OPEN registrada
 
-        # ── SEGURIDAD: solo actuar sobre tokens con contrato verificado ────────
-        # 1. El simbolo debe estar en nuestro registry
+        # SEGURIDAD: solo actuar sobre tokens con contrato en nuestro registry
         known_contract = KNOWN_CONTRACTS.get(symbol)
         if not known_contract:
-            log(f"  IGNORADO (no registrado): {symbol} contrato={contract_wallet} — "
-                f"token desconocido, NO interactuar por seguridad")
+            log(f"  {symbol}: sin contrato registrado — ignorado por seguridad")
             continue
 
-        # 2. El contrato de la wallet debe coincidir exactamente con el registrado
-        if contract_wallet and contract_wallet != known_contract.lower():
-            log(f"  ALERTA DE SEGURIDAD: {symbol} en wallet con contrato DIFERENTE al registrado")
-            log(f"    Registrado : {known_contract}")
-            log(f"    En wallet  : {contract_wallet}")
-            log(f"    IGNORADO — posible token malicioso, NO interactuar")
+        balance = get_token_balance_twak(known_contract)
+        if balance is None:
+            log(f"  {symbol}: TWAK no respondio — ignorado")
             continue
 
-        # Token verificado — crear posicion de recuperacion
-        entry_price = round(usd / balance, 8) if balance > 0 else 0
+        # Umbral minimo: 0.5% del balance original esperado o valor > $0.10
+        if balance <= 0.0001:
+            continue  # dust, ignorar
+
+        log(f"  HUERFANO DETECTADO: {balance} {symbol} en wallet sin posicion OPEN")
+
         recovery_position = {
             "symbol":         symbol,
-            "capital":        round(usd, 4),
-            "entry_price":    entry_price,
+            "capital":        0,       # desconocido sin precio historico
+            "entry_price":    0,
             "tokens":         balance,
             "entry_time":     datetime.utcnow().isoformat(),
             "hold_min_hours": 0,
@@ -232,12 +208,11 @@ def recover_orphan_tokens(open_positions):
             "sentiment":      "NEUTRO",
             "volume_ratio":   1.0,
             "narrative":      "general",
-            "reasoning":      f"RECUPERACION AUTOMATICA: {balance} {symbol} encontrados en wallet sin posicion registrada. Vender para recuperar USDT.",
+            "reasoning":      f"RECUPERACION: {balance} {symbol} encontrados en wallet sin posicion OPEN. Vender para recuperar USDT.",
             "status":         "OPEN",
             "recovery":       True,
         }
         recovered.append(recovery_position)
-        log(f"  HUERFANO VERIFICADO: {balance} {symbol} (~${usd:.2f}) contrato OK — creando posicion de recuperacion")
 
     return recovered
 

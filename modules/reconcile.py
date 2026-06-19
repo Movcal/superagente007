@@ -263,7 +263,18 @@ def reconcile():
     log(f"  Posiciones CLOSED: {len(closed_positions)}")
 
     if not open_positions:
-        log("Sin posiciones abiertas. Agente arranca desde cero.")
+        log("Sin posiciones abiertas en JSON.")
+        if not PAPER_MODE:
+            log("Verificando wallet por tokens huerfanos...")
+            recovered = recover_orphan_tokens([])
+            if recovered:
+                log(f"  {len(recovered)} token(s) huerfanos encontrados — agregando posiciones de recuperacion")
+                for r in recovered:
+                    all_positions.append(r)
+                save_positions(all_positions)
+                log("=" * 55)
+                return recovered
+        log("Agente arranca desde cero.")
         log("=" * 55)
         return []
 

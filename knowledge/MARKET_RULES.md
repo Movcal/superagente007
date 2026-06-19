@@ -244,6 +244,28 @@ El número de Fear & Greed por sí solo no define si entrar o no. Lo que importa
 - Los tokens más volátiles del ecosistema BNB (ASTER, KOGE, NFT) se mueven con fuerza pero también caen fuerte.
 - Con la estrategia de trailing stop 1% + stop loss -3%, estos tokens son viables SOLO si la entrada es precisa (narrativa + volumen + TA alineados al momento de entrada).
 
+### 7.4 PEAQ — lección de detección tardía y timing de entrada (19 jun 2026)
+
+**Qué pasó:**
+- PEAQ estaba en watchlist desde el 17 jun con narrativa "ia", RSI 41.7, bull_score 62%.
+- El pump real empezó a las **02:05 UTC** del 19 jun. En esa vela de 5min el volumen fue **34x** el promedio de las 24 velas anteriores. El precio subió de $0.0211 a $0.0222 (+5.2% en esa sola vela).
+- El sistema antiguo usaba CMC volume_24h rolling. A las 02:05, CMC mostraba solo **1.09x** — no detectó nada.
+- La noticia real (Upbit listing) salió a las **03:39 UTC** — 1h35min después del inicio del pump.
+- El bot entró a las **03:40 UTC** a $0.0266 — comprando en el pico, no en el inicio.
+- Precio máximo alcanzado: $0.0269. Ganancia potencial desde entrada: casi 0%. Ganancia desde inicio del pump: +27%.
+
+**Lección para el agente:**
+- **La noticia confirma el pump, no lo genera.** Cuando una noticia importante (listing en exchange top) sale, el precio ya subió. Los insiders y bots más rápidos ya compraron.
+- **El volumen de 5 minutos es la señal real.** Un spike de 10x+ en una sola vela de 5min es el evento. La noticia es el ruido posterior.
+- **RSI no sirve como filtro en el momento del spike.** A las 02:05, el RSI ya estaba en 85 (overbought). Si hubiéramos esperado RSI bajo para entrar, nunca hubiéramos entrado. El RSI sirvió para AGREGAR al watchlist (RSI 41.7 el 17 jun = técnicamente sano antes del pump), no para decidir la entrada durante el pump.
+- **Regla nueva aplicada:** Token en watchlist + volumen 5min >= 3x + precio subió en esa vela = entrada inmediata sin esperar noticia, sin esperar Claude, sin re-verificar TA.
+- **El mercado premia la velocidad, no la confirmación.** Cada minuto esperando confirmación es precio adicional que se paga.
+
+**Cambios implementados a raíz de PEAQ:**
+- volume_monitor reescrito: velas 5min Gate.io/MEXC/KuCoin en vez de CMC 24h rolling.
+- decision_engine: tokens en watchlist entran directo si precio subió con volumen. Claude investiga post-entrada.
+- Umbral dinámico: watchlist 3+ dias = 2x, watchlist reciente = 3x, sin narrativa = 5x.
+
 ---
 
 ## REGLAS ESPECÍFICAS PARA EL CONCURSO

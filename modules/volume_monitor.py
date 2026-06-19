@@ -88,6 +88,54 @@ def fetch_gate_candle(gate_symbol):
     return None
 
 
+def fetch_gate_candles_bulk(gate_symbol, limit=1001):
+    """Trae las ultimas N velas completadas de 5min de Gate.io.
+    Retorna (current_tuple, history_vols) donde:
+      - current_tuple = (vol_usdt, open, close) de la ultima vela completada
+      - history_vols  = lista de vol_usdt de las 1000 velas anteriores
+    """
+    try:
+        r = requests.get(
+            "https://api.gateio.ws/api/v4/spot/candlesticks",
+            params={"currency_pair": f"{gate_symbol}_USDT", "interval": "5m", "limit": str(limit + 1)},
+            timeout=15
+        )
+        if r.status_code == 200:
+            data = r.json()
+            if len(data) < 3:
+                return None, []
+            # data[-1] = vela formandose (excluir)
+            # data[-2] = ultima vela completada = actual
+            # data[:-2] = historial
+            current = data[-2]
+            history_candles = data[:-2]
+            current_tuple = (float(current[1]), float(current[5]), float(current[2]))
+            history_vols = [float(c[1]) for c in history_candles]
+            return current_tuple, history_vols
+    except Exception as e:
+        log(f"Error Gate.io bulk {gate_symbol}: {e}")
+    return None, []
+
+
+def load_watchlist_symbols():
+    """Retorna el set de simbolos actualmente en watchlist."""
+    if not os.path.exists("data/watchlist.json"):
+        return set()
+    try:
+        with open("data/watchlist.json") as f:
+            return set(json.load(f).keys())
+    except Exception:
+        return set()
+
+
+def is_top2_spike(current_vol, history_vols):
+    """Retorna True si current_vol esta entre las 2 velas mas grandes del historial."""
+    if len(history_vols) < 10:
+        return False
+    top2_threshold = sorted(history_vols, reverse=True)[1]  # 2do mas grande
+    return current_vol >= top2_threshold
+
+
 def fetch_mexc_candle(symbol):
     """Ultima vela completada de 5min de MEXC.
     MEXC formato: [timestamp, open, high, low, close, vol_base, ...]
@@ -307,11 +355,79 @@ def update_history(history, candle_data):
 def run_once():
     """Ejecuta una sola revision de volumenes. Retorna lista de alertas."""
     log("Revisando volumenes por vela 5min...")
+
+    watchlist_symbols = load_watchlist_symbols()
     history = load_history()
-    candle_data = fetch_all_volumes()
+    candle_data = {}
+    alerts = []
+
+    for symbol in TOKENS:
+        if symbol in STABLECOINS:
+            continue
+
+        source_info = EXCHANGE_SOURCE.get(symbol)
+        exchange   = source_info[0] if source_info else "gate"
+        ex_symbol  = source_info[1] if source_info else symbol
+
+        if exchange == "cmc":
+            continue  # se procesa en lote aparte
+
+        # ── WATCHLIST en Gate.io: metodo top-2 de 1000 velas ─────────────────
+        if symbol in watchlist_symbols and exchange == "gate":
+            current_tuple, hist_vols = fetch_gate_candles_bulk(ex_symbol, limit=1001)
+            if current_tuple:
+                current_vol, open_, close = current_tuple
+                candle_data[symbol] = current_tuple
+                price_up = close > open_ if open_ > 0 else False
+                price_change_pct = round((close - open_) / open_ * 100, 2) if open_ > 0 else 0
+
+                if price_up and is_top2_spike(current_vol, hist_vols):
+                    avg_vol = round(sum(hist_vols) / len(hist_vols), 2) if hist_vols else 0
+                    ratio   = round(current_vol / avg_vol, 2) if avg_vol > 0 else 0
+                    alert = {
+                        "symbol":           symbol,
+                        "ratio":            ratio,
+                        "current_volume":   current_vol,
+                        "avg_volume":       avg_vol,
+                        "open":             open_,
+                        "close":            close,
+                        "price_change_pct": price_change_pct,
+                        "timestamp":        datetime.utcnow().isoformat(),
+                        "priority":         symbol in PRIORITY_TOKENS,
+                        "threshold_used":   "top2_of_1000",
+                        "in_watchlist":     True,
+                    }
+                    alerts.append(alert)
+                    save_alert(alert)
+                    log(f"ALERTA WATCHLIST [TOP-2/1000]: {symbol} | vol ${current_vol:,.0f} | precio {price_change_pct:+.2f}%")
+
+        # ── RESTO de tokens: metodo clasico de promedio ───────────────────────
+        else:
+            if exchange == "mexc":
+                candle = fetch_mexc_candle(ex_symbol)
+            elif exchange == "kucoin":
+                candle = fetch_kucoin_candle(ex_symbol)
+            else:
+                candle = fetch_gate_candle(ex_symbol)
+            if candle:
+                candle_data[symbol] = candle
+
+        time.sleep(0.12)
+
+    # CMC fallback en lote para tokens sin par en CEX
+    cmc_fallback = [s for s in TOKENS if EXCHANGE_SOURCE.get(s, ("gate",))[0] == "cmc" and s not in STABLECOINS]
+    if cmc_fallback:
+        cmc_vols = fetch_cmc_volumes(cmc_fallback)
+        for sym, vol in cmc_vols.items():
+            candle_data[sym] = (vol, 0, 0)
+
     log(f"Tokens consultados: {len(candle_data)}")
 
-    alerts = check_volume_spikes(candle_data, history)
+    # Metodo clasico para tokens fuera de watchlist
+    non_watchlist_data = {s: v for s, v in candle_data.items() if s not in watchlist_symbols}
+    classic_alerts = check_volume_spikes(non_watchlist_data, history)
+    alerts.extend(classic_alerts)
+
     history = update_history(history, candle_data)
     save_history(history)
 

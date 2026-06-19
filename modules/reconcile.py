@@ -195,14 +195,31 @@ def recover_orphan_tokens(open_positions):
     recovered = []
 
     for item in portfolio:
-        symbol  = item["symbol"]
-        balance = item["balance"]
-        usd     = item["usd_value"]
+        symbol           = item["symbol"]
+        balance          = item["balance"]
+        usd              = item["usd_value"]
+        contract_wallet  = (item.get("contract") or "").lower()
 
         if symbol in open_symbols:
             continue  # ya tiene posicion OPEN, el reconcile normal lo maneja
 
-        # Token en wallet sin registro — crear posicion de recuperacion
+        # ── SEGURIDAD: solo actuar sobre tokens con contrato verificado ────────
+        # 1. El simbolo debe estar en nuestro registry
+        known_contract = KNOWN_CONTRACTS.get(symbol)
+        if not known_contract:
+            log(f"  IGNORADO (no registrado): {symbol} contrato={contract_wallet} — "
+                f"token desconocido, NO interactuar por seguridad")
+            continue
+
+        # 2. El contrato de la wallet debe coincidir exactamente con el registrado
+        if contract_wallet and contract_wallet != known_contract.lower():
+            log(f"  ALERTA DE SEGURIDAD: {symbol} en wallet con contrato DIFERENTE al registrado")
+            log(f"    Registrado : {known_contract}")
+            log(f"    En wallet  : {contract_wallet}")
+            log(f"    IGNORADO — posible token malicioso, NO interactuar")
+            continue
+
+        # Token verificado — crear posicion de recuperacion
         entry_price = round(usd / balance, 8) if balance > 0 else 0
         recovery_position = {
             "symbol":         symbol,
@@ -220,7 +237,7 @@ def recover_orphan_tokens(open_positions):
             "recovery":       True,
         }
         recovered.append(recovery_position)
-        log(f"  HUERFANO DETECTADO: {balance} {symbol} (~${usd:.2f}) sin posicion OPEN — creando posicion de recuperacion")
+        log(f"  HUERFANO VERIFICADO: {balance} {symbol} (~${usd:.2f}) contrato OK — creando posicion de recuperacion")
 
     return recovered
 

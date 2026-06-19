@@ -8,6 +8,7 @@ from modules.sentiment_analyzer import analyze as analyze_sentiment
 from modules.news_analyzer import get_market_bias
 from modules.market_intelligence import get_narrative_boost, get_narrative_confirmation
 from modules.technical_screener import get_token_ta
+from modules.trade_journal import format_lessons_for_prompt
 
 load_dotenv()
 
@@ -257,9 +258,18 @@ def evaluate(volume_alert, path="B"):
     # Analisis Claude:
     # - PATH B (sin watchlist): ANTES de entrar — puede bloquear la operacion
     # - PATH A (watchlist): NO bloquea — Claude documenta el catalizador post-decision
+    # Lecciones de trades anteriores — contexto para Claude
+    past_lessons = format_lessons_for_prompt(symbol)
+    if past_lessons:
+        log(f"{symbol} tiene lecciones previas:\n{past_lessons}")
+
     market_bias = None
     if not in_watchlist:
-        market_bias = get_market_bias(symbol, extra_context={"ta_analysis": ta_summary_for_claude, "in_watchlist": False})
+        market_bias = get_market_bias(symbol, extra_context={
+            "ta_analysis": ta_summary_for_claude,
+            "in_watchlist": False,
+            "past_lessons": past_lessons,
+        })
         if market_bias:
             if market_bias["action_modifier"] == "SKIP":
                 log(f"{symbol} rechazado por Claude: {market_bias['reason']}")
@@ -269,6 +279,8 @@ def evaluate(volume_alert, path="B"):
                 # Se aplica el 50% de reduccion despues de calculate_position_size
     else:
         log(f"{symbol} [WATCHLIST] Claude documentara el catalizador post-entrada (no bloquea decision)")
+        if past_lessons:
+            log(f"{symbol} lecciones previas disponibles para referencia post-entrada")
 
     # Calcular capital
     capital = calculate_position_size(volume_ratio, sentiment["score"], sentiment["is_priority"], symbol)

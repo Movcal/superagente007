@@ -12,6 +12,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 load_dotenv()
 
 from modules.token_registry import get_contract
+from modules.trade_journal import analyze_trade
 
 WALLET_PASSWORD = os.getenv("TWAK_WALLET_PASSWORD")
 CMC_API_KEY     = os.getenv("CMC_API_KEY", "")
@@ -352,6 +353,14 @@ def sell(position, reason="señal de salida"):
         save_positions(positions)
         pnl_str = f" | PnL: ${pnl_usd} ({pnl_pct:+.2f}%)" if pnl_pct is not None else ""
         log(f"POSICION CERRADA: {symbol} | Razon: {reason}{pnl_str}")
+
+        # Analisis post-trade: Claude extrae leccion para aprendizaje futuro
+        closed_position = next((p for p in load_positions() if p["symbol"] == symbol and p["status"] == "CLOSED" and p.get("exit_time")), None)
+        if closed_position:
+            try:
+                analyze_trade(closed_position)
+            except Exception as e:
+                log(f"Error en analisis post-trade de {symbol}: {e}")
 
     return ok
 

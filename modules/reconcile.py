@@ -191,9 +191,20 @@ def recover_orphan_tokens(open_positions):
             log(f"  {symbol}: TWAK no respondio — ignorado")
             continue
 
-        # Umbral minimo: 0.5% del balance original esperado o valor > $0.10
-        if balance <= 0.0001:
-            continue  # dust, ignorar
+        if balance <= 0:
+            continue
+
+        # Estimar valor USD usando el ultimo precio de entrada conocido
+        last_price = None
+        for p in load_positions():
+            if p.get("symbol") == symbol and p.get("entry_price"):
+                last_price = p["entry_price"]
+        est_usd = balance * last_price if last_price else 0
+
+        # Ignorar si el valor estimado es menor a $0.50 (polvo de ventas al 99.9%)
+        if est_usd < 0.50:
+            log(f"  {symbol}: balance {balance} (~${est_usd:.4f}) es polvo — ignorado")
+            continue
 
         log(f"  HUERFANO DETECTADO: {balance} {symbol} en wallet sin posicion OPEN")
 

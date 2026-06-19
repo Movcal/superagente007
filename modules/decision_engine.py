@@ -186,6 +186,21 @@ def generate_reasoning(symbol, volume_alert, sentiment_result, capital, hold_min
     return "\n".join(lines)
 
 
+def is_macro_blackout():
+    """Retorna True si estamos en ventana de silencio por dato macro de alto impacto."""
+    now = datetime.utcnow()
+    # Jueves 25 Jun 2026: PCE + PIB US a las 09:30 UTC
+    # Silencio 09:00-10:00 UTC para evitar entrar en volatilidad de dato macro
+    if now.date().isoformat() == "2026-06-25" and now.hour == 9:
+        log("MACRO BLACKOUT: PCE + PIB US a las 09:30 UTC — no se abren posiciones nuevas esta hora")
+        return True
+    # Lunes 22 Jun: Lagarde BCE 09:30 UTC
+    if now.date().isoformat() == "2026-06-22" and now.hour == 9:
+        log("MACRO BLACKOUT: Comparecencia Lagarde BCE 09:30 UTC — cautela esta hora")
+        return True
+    return False
+
+
 def evaluate(volume_alert, path="B"):
     """
     Evalua si entrar en un trade dado una alerta de volumen.
@@ -196,6 +211,10 @@ def evaluate(volume_alert, path="B"):
     volume_ratio = volume_alert["ratio"]
 
     log(f"Evaluando {symbol} (volumen: {volume_ratio}x, camino: {path})")
+
+    if is_macro_blackout():
+        log(f"{symbol} rechazado: ventana de silencio por dato macro de alto impacto")
+        return None
 
     # Verificar si ya tenemos posicion ABIERTA en este token
     positions = load_positions()

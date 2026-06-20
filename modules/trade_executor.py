@@ -85,6 +85,35 @@ def run_twak(args):
         return None
 
 
+def get_token_balance(symbol):
+    """Consulta el balance real del token en la wallet via TWAK.
+    Retorna float con el balance, o None si no se pudo obtener.
+    """
+    contract = get_contract(symbol)
+    if not contract:
+        return None
+    twak_exe = shutil.which("twak")
+    if not twak_exe:
+        return None
+    env = os.environ.copy()
+    if WALLET_PASSWORD:
+        env["TWAK_WALLET_PASSWORD"] = WALLET_PASSWORD
+    try:
+        result = subprocess.run(
+            [twak_exe, "balance", "--chain", "bsc", "--token", contract, "--json"],
+            capture_output=True, text=True, timeout=30, shell=False, env=env
+        )
+        if result.returncode == 0 and result.stdout:
+            data = json.loads(result.stdout)
+            # TWAK retorna {"balance": "123.45", "symbol": "FLOKI", ...}
+            bal = data.get("balance") or data.get("formatted") or data.get("amount")
+            if bal is not None:
+                return float(str(bal).split()[0])
+    except Exception as e:
+        log(f"Error consultando balance de {symbol}: {e}")
+    return None
+
+
 # ── Paper mode helpers ────────────────────────────────────────────────────────
 
 def load_paper_trades():
@@ -327,9 +356,18 @@ def sell(position, reason="señal de salida"):
         log(f"Vendiendo {amount_to_sell} {symbol} (99.9% de {tokens})")
         swap_result = execute_swap(symbol, BASE_TOKEN, amount_to_sell)
         if not swap_result:
-            log(f"Swap de venta fallido para {symbol}")
-            return False
-        ok = True
+            # Verificar si los tokens ya salieron de la wallet a pesar del error
+            # (ocurre cuando TWAK reporta error pero la tx se confirmo on-chain)
+            actual_balance = get_token_balance(symbol)
+            if actual_balance is not None and actual_balance < (tokens * 0.01):
+                log(f"Swap reporto error pero balance real de {symbol} es {actual_balance} (dust) — venta ejecutada on-chain, cerrando posicion")
+                ok = True
+                exit_price = get_real_price(symbol)
+            else:
+                log(f"Swap de venta fallido para {symbol} | balance actual: {actual_balance}")
+                return False
+        else:
+            ok = True
         exit_price = get_real_price(symbol)
         if exit_price:
             entry_price = position.get("entry_price") or (position["capital"] / tokens if tokens else None)

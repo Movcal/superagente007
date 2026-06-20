@@ -372,8 +372,8 @@ def run_once():
         if exchange == "cmc":
             continue  # se procesa en lote aparte
 
-        # ── WATCHLIST en Gate.io: metodo top-2 de 1000 velas ─────────────────
-        if symbol in watchlist_symbols and exchange == "gate":
+        # ── Gate.io: TODOS usan top-2 de 1000 velas ──────────────────────────
+        if exchange == "gate":
             current_tuple, hist_vols = fetch_gate_candles_bulk(ex_symbol, limit=1001)
             if current_tuple:
                 current_vol, open_, close = current_tuple
@@ -395,20 +395,18 @@ def run_once():
                         "timestamp":        datetime.utcnow().isoformat(),
                         "priority":         symbol in PRIORITY_TOKENS,
                         "threshold_used":   "top2_of_1000",
-                        "in_watchlist":     True,
+                        "in_watchlist":     symbol in watchlist_symbols,
                     }
                     alerts.append(alert)
                     save_alert(alert)
-                    log(f"ALERTA WATCHLIST [TOP-2/1000]: {symbol} | vol ${current_vol:,.0f} | precio {price_change_pct:+.2f}%")
+                    log(f"ALERTA [TOP-2/1000]: {symbol} | vol ${current_vol:,.0f} | precio {price_change_pct:+.2f}%")
 
-        # ── RESTO de tokens: metodo clasico de promedio ───────────────────────
+        # ── MEXC / KuCoin: metodo clasico (sin bulk disponible) ──────────────
         else:
             if exchange == "mexc":
                 candle = fetch_mexc_candle(ex_symbol)
             elif exchange == "kucoin":
                 candle = fetch_kucoin_candle(ex_symbol)
-            else:
-                candle = fetch_gate_candle(ex_symbol)
             if candle:
                 candle_data[symbol] = candle
 
@@ -423,9 +421,10 @@ def run_once():
 
     log(f"Tokens consultados: {len(candle_data)}")
 
-    # Metodo clasico para tokens fuera de watchlist
-    non_watchlist_data = {s: v for s, v in candle_data.items() if s not in watchlist_symbols}
-    classic_alerts = check_volume_spikes(non_watchlist_data, history)
+    # Metodo clasico solo para MEXC/KuCoin (sin bulk disponible)
+    non_gate_data = {s: v for s, v in candle_data.items()
+                     if EXCHANGE_SOURCE.get(s, ("gate",))[0] in ("mexc", "kucoin")}
+    classic_alerts = check_volume_spikes(non_gate_data, history)
     alerts.extend(classic_alerts)
 
     history = update_history(history, candle_data)

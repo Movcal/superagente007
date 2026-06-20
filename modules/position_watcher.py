@@ -18,10 +18,11 @@ POSITIONS_FILE = "data/open_positions.json"
 WATCHER_LOG    = "logs/position_watcher.log"
 COMPLIANCE_FILE = "data/compliance_trades.json"
 
-# Umbrales de salida — estrategia semana de competencia
-STOP_LOSS_PCT      = -3.0  # stop loss fijo (antes de que se active el trailing)
-TRAILING_STOP_PCT  = 0.01  # trailing stop: 1% bajo el maximo alcanzado
-TRAILING_ACTIVATION = 0.01 # se activa cuando precio sube 1% desde entrada
+# Umbrales de salida — trailing stop en 2 fases
+# Fase 1 (proteccion): trailing 3% bajo el maximo hasta que stop = precio de entrada
+# Fase 2 (ganancias):  trailing 2% bajo el maximo una vez en break-even
+PHASE1_TRAIL_PCT   = 0.03  # 3% — protege capital desde el primer segundo
+PHASE2_TRAIL_PCT   = 0.02  # 2% — captura ganancias una vez en break-even
 BTC_DROP_ALERT_PCT = -3.0  # salir de alts si BTC cae 3%
 
 # Palabras clave de noticias negativas que fuerzan salida inmediata
@@ -305,11 +306,21 @@ def check_exit_conditions(position, current_price, btc_change):
     Evalua si se debe salir de una posicion.
     Retorna: (debe_salir, razon, posicion_actualizada)
 
-    Salidas en orden de prioridad:
-      1. BTC cae mas del 3% (macro)
-      2. Trailing stop 2% (activo cuando precio sube 2% desde entrada)
-      3. Stop loss -8% (antes de que el trailing se active)
-    Sin tiempo maximo — la posicion dura mientras no se activen las salidas.
+    Trailing stop en 2 fases — activo desde el primer segundo:
+
+    FASE 1 — Proteccion de capital (stop 3% bajo el maximo):
+      - Stop = highest_price * 0.97
+      - Se mantiene hasta que stop >= entry_price (break-even alcanzado)
+      - Ejemplo: entrada $100 → stop $97; precio sube a $103.10 → stop = $100
+
+    FASE 2 — Captura de ganancias (stop 2% bajo el maximo):
+      - Se activa cuando highest_price * 0.97 >= entry_price
+      - Stop = highest_price * 0.98
+      - Ejemplo: precio $106 → stop $103.88; precio $115 → stop $112.70
+
+    Otras salidas:
+      - BTC cae mas del 3% (macro)
+      - Noticias negativas / señales MCP (evaluadas en check_all_positions)
     """
     symbol = position["symbol"]
 
@@ -321,31 +332,41 @@ def check_exit_conditions(position, current_price, btc_change):
     if btc_change <= BTC_DROP_ALERT_PCT:
         return True, f"BTC cayo {btc_change:.2f}% (proteccion macro)", position
 
-    entry_price = get_entry_price(position)
+    entry_price = position.get("entry_price") or get_entry_price(position)
     if not entry_price or not current_price:
         return False, None, position
 
     pct_change = ((current_price - entry_price) / entry_price) * 100
 
-    # Actualizar highest_price
+    # Actualizar highest_price (nunca baja)
     highest_price = max(position.get("highest_price", entry_price), current_price)
     position["highest_price"] = highest_price
 
-    # 2. Trailing stop (se activa cuando precio sube TRAILING_ACTIVATION desde entrada)
-    if highest_price >= entry_price * (1 + TRAILING_ACTIVATION):
-        trailing_stop = highest_price * (1 - TRAILING_STOP_PCT)
+    # Stop de Fase 1: 3% bajo el maximo
+    phase1_stop = highest_price * (1 - PHASE1_TRAIL_PCT)
+
+    # Fase 2 se activa cuando el stop de fase 1 ya cubre el precio de entrada (break-even)
+    if phase1_stop >= entry_price:
+        # FASE 2: trailing 2% bajo el maximo
+        trailing_stop = highest_price * (1 - PHASE2_TRAIL_PCT)
         if current_price <= trailing_stop:
-            return True, (f"trailing stop: precio ${current_price:.4f} bajo "
-                          f"${trailing_stop:.4f} (2% bajo maximo ${highest_price:.4f}, "
-                          f"ganancia neta: {pct_change:+.2f}%)"), position
-        log(f"{symbol}: ${current_price:.4f} | max ${highest_price:.4f} | "
-            f"trailing stop ${trailing_stop:.4f} | {pct_change:+.2f}%")
+            return True, (
+                f"trailing stop fase 2 (2%): precio ${current_price:.6f} bajo "
+                f"${trailing_stop:.6f} | max ${highest_price:.6f} | {pct_change:+.2f}%"
+            ), position
+        log(f"{symbol}: ${current_price:.6f} | max ${highest_price:.6f} | "
+            f"stop fase 2 ${trailing_stop:.6f} | {pct_change:+.2f}%")
     else:
-        # 3. Stop loss fijo mientras trailing no esta activo
-        if pct_change <= STOP_LOSS_PCT:
-            return True, f"stop loss: {pct_change:.2f}%", position
-        log(f"{symbol}: ${current_price:.4f} | entrada ${entry_price:.4f} | "
-            f"{pct_change:+.2f}% (trailing aun no activo)")
+        # FASE 1: trailing 3% bajo el maximo
+        trailing_stop = phase1_stop
+        if current_price <= trailing_stop:
+            return True, (
+                f"trailing stop fase 1 (3%): precio ${current_price:.6f} bajo "
+                f"${trailing_stop:.6f} | max ${highest_price:.6f} | {pct_change:+.2f}%"
+            ), position
+        log(f"{symbol}: ${current_price:.6f} | entrada ${entry_price:.6f} | "
+            f"stop fase 1 ${trailing_stop:.6f} | {pct_change:+.2f}% "
+            f"(break-even en ${entry_price / (1 - PHASE1_TRAIL_PCT):.6f})")
 
     return False, None, position
 

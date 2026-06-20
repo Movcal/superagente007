@@ -88,16 +88,16 @@ def fetch_gate_candle(gate_symbol):
     return None
 
 
-def fetch_gate_candles_bulk(gate_symbol, limit=1001):
-    """Trae las ultimas N velas completadas de 5min de Gate.io.
+def fetch_gate_candles_bulk(gate_symbol, limit=900):
+    """Trae las ultimas N velas completadas de 5min de Gate.io (maximo 1000).
     Retorna (current_tuple, history_vols) donde:
       - current_tuple = (vol_usdt, open, close) de la ultima vela completada
-      - history_vols  = lista de vol_usdt de las 1000 velas anteriores
+      - history_vols  = lista de vol_usdt de las velas anteriores (~898)
     """
     try:
         r = requests.get(
             "https://api.gateio.ws/api/v4/spot/candlesticks",
-            params={"currency_pair": f"{gate_symbol}_USDT", "interval": "5m", "limit": str(limit + 1)},
+            params={"currency_pair": f"{gate_symbol}_USDT", "interval": "5m", "limit": str(limit)},
             timeout=15
         )
         if r.status_code == 200:
@@ -374,7 +374,7 @@ def run_once():
 
         # ── Gate.io: TODOS usan top-2 de 1000 velas ──────────────────────────
         if exchange == "gate":
-            current_tuple, hist_vols = fetch_gate_candles_bulk(ex_symbol, limit=1001)
+            current_tuple, hist_vols = fetch_gate_candles_bulk(ex_symbol, limit=900)
             if current_tuple:
                 current_vol, open_, close = current_tuple
                 candle_data[symbol] = current_tuple

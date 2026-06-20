@@ -128,7 +128,7 @@ def _log_position_context(position, balance_real=None):
     log(f"    Tokens  : {tokens}")
     log(f"    Narrativa: {narrative} | Volumen: {vol_ratio}x | Sentimiento: {sentiment}")
     log(f"    Hold    : {hold_min}-{hold_max}h | Tiempo restante max: ~{max(0, float(hold_max) - hours_open) if hours_open else '?'}h")
-    log(f"    Salida  : TP +15% | SL -8% | Max {hold_max}h | BTC -3% macro")
+    log(f"    Salida  : Trailing 3%->2% | BTC -3% macro | Noticias negativas")
     log(f"    Estado  : position_watcher retoma monitoreo automaticamente")
 
 

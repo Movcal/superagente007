@@ -177,10 +177,9 @@ def generate_reasoning(symbol, volume_alert, sentiment_result, capital, hold_min
         f"",
         f"EXIT CONDITIONS:",
         f"  - Price rises +15% from entry (take profit)",
-        f"  - Price drops -8% from entry (stop loss)",
+        f"  - Trailing stop: 3% bajo maximo (fase 1) -> 2% tras break-even (fase 2)",
         f"  - Volume returns to average (signal exhausted)",
         f"  - BTC drops more than 3% (macro protection)",
-        f"  - Max hold: {hold_max} hours regardless of price",
     ]
 
     return "\n".join(lines)

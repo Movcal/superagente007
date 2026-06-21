@@ -462,8 +462,10 @@ def run_compliance_check():
     Se ejecuta cerca del final del dia UTC.
     """
     now_utc = datetime.utcnow()
-    # Solo ejecutar entre las 22:00 y 23:00 UTC si no hubo trades
-    if 22 <= now_utc.hour < 23:
+    # Ventana principal: 22:00-23:59 UTC — dos horas para asegurar el compliance
+    # needs_compliance_trade() verifica que no haya habido trades reales ni compliance previo
+    # Si el primer intento falla, el ciclo de 5min reintenta automaticamente hasta medianoche
+    if 22 <= now_utc.hour <= 23:
         if needs_compliance_trade():
             log("No hubo trades hoy. Ejecutando trade de cumplimiento...")
             from modules.trade_executor import compliance_trade
@@ -471,6 +473,8 @@ def run_compliance_check():
             if success:
                 log_compliance_trade()
                 log("Trade de cumplimiento ejecutado correctamente")
+            else:
+                log("Trade de cumplimiento FALLO — se reintentara en el proximo ciclo (5min)")
         else:
             log("Ya hubo al menos 1 trade hoy, no se necesita compliance trade")
 

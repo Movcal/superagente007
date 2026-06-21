@@ -128,12 +128,26 @@ def load_watchlist_symbols():
         return set()
 
 
-def is_top2_spike(current_vol, history_vols):
-    """Retorna True si current_vol esta entre las 2 velas mas grandes del historial."""
+def is_watchlist_spike(current_vol, history_vols):
+    """Path A (watchlist): alerta si current_vol > 3x promedio de las 10 velas mas grandes del historial de 900."""
     if len(history_vols) < 10:
-        return False
-    top2_threshold = sorted(history_vols, reverse=True)[1]  # 2do mas grande
-    return current_vol >= top2_threshold
+        return False, 0
+    top10_avg = sum(sorted(history_vols, reverse=True)[:10]) / 10
+    if top10_avg == 0:
+        return False, 0
+    ratio = current_vol / top10_avg
+    return ratio >= 3.0, ratio
+
+
+def is_nonwatchlist_spike(current_vol, history_vols):
+    """Path B (sin watchlist): alerta si current_vol > 5x promedio de las 900 velas."""
+    if len(history_vols) < 10:
+        return False, 0
+    avg = sum(history_vols) / len(history_vols)
+    if avg == 0:
+        return False, 0
+    ratio = current_vol / avg
+    return ratio >= 5.0, ratio
 
 
 def fetch_mexc_candle(symbol):
@@ -158,6 +172,63 @@ def fetch_mexc_candle(symbol):
     except Exception as e:
         log(f"Error MEXC {symbol}: {e}")
     return None
+
+
+def fetch_mexc_candles_bulk(symbol, limit=900):
+    """Trae las ultimas N velas completadas de 5min de MEXC.
+    Retorna (current_tuple, history_vols).
+    """
+    try:
+        r = requests.get(
+            "https://api.mexc.com/api/v3/klines",
+            params={"symbol": f"{symbol}USDT", "interval": "5m", "limit": str(limit + 1)},
+            timeout=15
+        )
+        if r.status_code == 200:
+            data = r.json()
+            if len(data) < 3:
+                return None, []
+            current = data[-2]
+            history_candles = data[:-2]
+            open_ = float(current[1])
+            close = float(current[4])
+            vol_usdt = float(current[5]) * close
+            current_tuple = (vol_usdt, open_, close)
+            history_vols = [float(c[5]) * float(c[4]) for c in history_candles]
+            return current_tuple, history_vols
+    except Exception as e:
+        log(f"Error MEXC bulk {symbol}: {e}")
+    return None, []
+
+
+def fetch_kucoin_candles_bulk(symbol, limit=900):
+    """Trae las ultimas N velas completadas de 5min de KuCoin (retorna descendente).
+    Retorna (current_tuple, history_vols).
+    """
+    try:
+        r = requests.get(
+            "https://api.kucoin.com/api/v1/market/candles",
+            params={"type": "5min", "symbol": f"{symbol}-USDT"},
+            timeout=15
+        )
+        if r.status_code == 200:
+            data = r.json().get("data", [])
+            data = data[:limit + 1]  # KuCoin retorna descendente
+            if len(data) < 3:
+                return None, []
+            # data[0] = vela mas reciente (puede estar formandose)
+            # data[1] = ultima completada
+            current = data[1]
+            history_candles = data[2:]
+            open_ = float(current[1])
+            close = float(current[2])
+            vol_usdt = float(current[6])
+            current_tuple = (vol_usdt, open_, close)
+            history_vols = [float(c[6]) for c in history_candles]
+            return current_tuple, history_vols
+    except Exception as e:
+        log(f"Error KuCoin bulk {symbol}: {e}")
+    return None, []
 
 
 def fetch_kucoin_candle(symbol):
@@ -372,7 +443,7 @@ def run_once():
         if exchange == "cmc":
             continue  # se procesa en lote aparte
 
-        # ── Gate.io: TODOS usan top-2 de 1000 velas ──────────────────────────
+        # ── Gate.io: Path A (watchlist) 3x top10 | Path B (sin watchlist) 5x avg ──
         if exchange == "gate":
             current_tuple, hist_vols = fetch_gate_candles_bulk(ex_symbol, limit=900)
             if current_tuple:
@@ -381,34 +452,80 @@ def run_once():
                 price_up = close > open_ if open_ > 0 else False
                 price_change_pct = round((close - open_) / open_ * 100, 2) if open_ > 0 else 0
 
-                if price_up and is_top2_spike(current_vol, hist_vols):
-                    avg_vol = round(sum(hist_vols) / len(hist_vols), 2) if hist_vols else 0
-                    ratio   = round(current_vol / avg_vol, 2) if avg_vol > 0 else 0
-                    alert = {
-                        "symbol":           symbol,
-                        "ratio":            ratio,
-                        "current_volume":   current_vol,
-                        "avg_volume":       avg_vol,
-                        "open":             open_,
-                        "close":            close,
-                        "price_change_pct": price_change_pct,
-                        "timestamp":        datetime.utcnow().isoformat(),
-                        "priority":         symbol in PRIORITY_TOKENS,
-                        "threshold_used":   "top2_of_1000",
-                        "in_watchlist":     symbol in watchlist_symbols,
-                    }
-                    alerts.append(alert)
-                    save_alert(alert)
-                    log(f"ALERTA [TOP-2/1000]: {symbol} | vol ${current_vol:,.0f} | precio {price_change_pct:+.2f}%")
+                if price_up and hist_vols:
+                    in_watchlist = symbol in watchlist_symbols
+                    if in_watchlist:
+                        spike, ratio = is_watchlist_spike(current_vol, hist_vols)
+                        threshold_desc = "3x_top10_avg_900"
+                        path = "A"
+                    else:
+                        spike, ratio = is_nonwatchlist_spike(current_vol, hist_vols)
+                        threshold_desc = "5x_avg_900"
+                        path = "B"
 
-        # ── MEXC / KuCoin: metodo clasico (sin bulk disponible) ──────────────
+                    if spike:
+                        avg_vol = round(sum(hist_vols) / len(hist_vols), 2) if hist_vols else 0
+                        alert = {
+                            "symbol":           symbol,
+                            "ratio":            round(ratio, 2),
+                            "current_volume":   current_vol,
+                            "avg_volume":       avg_vol,
+                            "open":             open_,
+                            "close":            close,
+                            "price_change_pct": price_change_pct,
+                            "timestamp":        datetime.utcnow().isoformat(),
+                            "priority":         symbol in PRIORITY_TOKENS,
+                            "threshold_used":   threshold_desc,
+                            "in_watchlist":     in_watchlist,
+                        }
+                        alerts.append(alert)
+                        save_alert(alert)
+                        log(f"ALERTA [PATH-{path}/{threshold_desc}]: {symbol} | vol ${current_vol:,.0f} | {ratio:.1f}x | precio {price_change_pct:+.2f}%")
+
+        # ── MEXC / KuCoin: mismo criterio con bulk ────────────────────────────
         else:
             if exchange == "mexc":
-                candle = fetch_mexc_candle(ex_symbol)
+                current_tuple, hist_vols = fetch_mexc_candles_bulk(ex_symbol, limit=900)
             elif exchange == "kucoin":
-                candle = fetch_kucoin_candle(ex_symbol)
-            if candle:
-                candle_data[symbol] = candle
+                current_tuple, hist_vols = fetch_kucoin_candles_bulk(ex_symbol, limit=900)
+            else:
+                current_tuple, hist_vols = None, []
+
+            if current_tuple:
+                current_vol, open_, close = current_tuple
+                candle_data[symbol] = current_tuple
+                price_up = close > open_ if open_ > 0 else False
+                price_change_pct = round((close - open_) / open_ * 100, 2) if open_ > 0 else 0
+
+                if price_up and hist_vols:
+                    in_watchlist = symbol in watchlist_symbols
+                    if in_watchlist:
+                        spike, ratio = is_watchlist_spike(current_vol, hist_vols)
+                        threshold_desc = "3x_top10_avg_900"
+                        path = "A"
+                    else:
+                        spike, ratio = is_nonwatchlist_spike(current_vol, hist_vols)
+                        threshold_desc = "5x_avg_900"
+                        path = "B"
+
+                    if spike:
+                        avg_vol = round(sum(hist_vols) / len(hist_vols), 2) if hist_vols else 0
+                        alert = {
+                            "symbol":           symbol,
+                            "ratio":            round(ratio, 2),
+                            "current_volume":   current_vol,
+                            "avg_volume":       avg_vol,
+                            "open":             open_,
+                            "close":            close,
+                            "price_change_pct": price_change_pct,
+                            "timestamp":        datetime.utcnow().isoformat(),
+                            "priority":         symbol in PRIORITY_TOKENS,
+                            "threshold_used":   threshold_desc,
+                            "in_watchlist":     in_watchlist,
+                        }
+                        alerts.append(alert)
+                        save_alert(alert)
+                        log(f"ALERTA [PATH-{path}/{threshold_desc}]: {symbol} | vol ${current_vol:,.0f} | {ratio:.1f}x | precio {price_change_pct:+.2f}%")
 
         time.sleep(0.12)
 
@@ -420,12 +537,6 @@ def run_once():
             candle_data[sym] = (vol, 0, 0)
 
     log(f"Tokens consultados: {len(candle_data)}")
-
-    # Metodo clasico solo para MEXC/KuCoin (sin bulk disponible)
-    non_gate_data = {s: v for s, v in candle_data.items()
-                     if EXCHANGE_SOURCE.get(s, ("gate",))[0] in ("mexc", "kucoin")}
-    classic_alerts = check_volume_spikes(non_gate_data, history)
-    alerts.extend(classic_alerts)
 
     history = update_history(history, candle_data)
     save_history(history)

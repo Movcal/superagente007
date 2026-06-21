@@ -372,35 +372,50 @@ def check_exit_conditions(position, current_price, btc_change):
 
 
 def needs_compliance_trade():
-    """Verifica si ya hubo al menos 1 trade hoy."""
+    """
+    Retorna True si aun se necesita el trade de cumplimiento hoy.
+    Retorna False si ya hubo un trade real O un compliance exitoso hoy.
+    """
     today = datetime.utcnow().strftime("%Y-%m-%d")
 
-    # Revisar posiciones abiertas y cerradas hoy
+    # Hubo trade real hoy
     positions = load_positions()
     for p in positions:
-        entry_date = p.get("entry_time", "")[:10]
-        if entry_date == today:
+        if p.get("entry_time", "")[:10] == today:
             return False
 
-    # Revisar compliance trades
+    # Ya se ejecuto compliance exitoso hoy
     if os.path.exists(COMPLIANCE_FILE):
         with open(COMPLIANCE_FILE, "r") as f:
             compliance = json.load(f)
         for t in compliance:
-            if t.get("date") == today:
+            if t.get("date") == today and t.get("success") is True:
                 return False
 
     return True
 
 
-def log_compliance_trade():
-    """Registra que se hizo un trade de cumplimiento hoy."""
+def get_compliance_attempts_today():
+    """Retorna cuantos intentos de compliance (exitosos o fallidos) hubo hoy."""
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    if not os.path.exists(COMPLIANCE_FILE):
+        return 0
+    try:
+        with open(COMPLIANCE_FILE, "r") as f:
+            compliance = json.load(f)
+        return sum(1 for t in compliance if t.get("date") == today)
+    except Exception:
+        return 0
+
+
+def log_compliance_trade(success=True):
+    """Registra un intento de compliance (exitoso o fallido) para el dia de hoy."""
     today = datetime.utcnow().strftime("%Y-%m-%d")
     trades = []
     if os.path.exists(COMPLIANCE_FILE):
         with open(COMPLIANCE_FILE, "r") as f:
             trades = json.load(f)
-    trades.append({"date": today, "timestamp": datetime.utcnow().isoformat()})
+    trades.append({"date": today, "timestamp": datetime.utcnow().isoformat(), "success": success})
     with open(COMPLIANCE_FILE, "w") as f:
         json.dump(trades, f, indent=2)
 
@@ -459,24 +474,38 @@ def check_all_positions():
 def run_compliance_check():
     """
     Verifica si hay que hacer trade de cumplimiento.
-    Se ejecuta cerca del final del dia UTC.
+    Logica:
+    - Si ya hubo trade real o compliance exitoso hoy: cancelado, no actua.
+    - Maximo 2 intentos por dia (exitosos o fallidos). Si fallo 2 veces: cancela.
+    - Ventana: 22:00-23:59 UTC.
     """
     now_utc = datetime.utcnow()
-    # Ventana principal: 22:00-23:59 UTC — dos horas para asegurar el compliance
-    # needs_compliance_trade() verifica que no haya habido trades reales ni compliance previo
-    # Si el primer intento falla, el ciclo de 5min reintenta automaticamente hasta medianoche
-    if 22 <= now_utc.hour <= 23:
-        if needs_compliance_trade():
-            log("No hubo trades hoy. Ejecutando trade de cumplimiento...")
-            from modules.trade_executor import compliance_trade
-            success = compliance_trade()
-            if success:
-                log_compliance_trade()
-                log("Trade de cumplimiento ejecutado correctamente")
-            else:
-                log("Trade de cumplimiento FALLO — se reintentara en el proximo ciclo (5min)")
+    if not (22 <= now_utc.hour <= 23):
+        return
+
+    # Si ya hay trade real o compliance exitoso hoy, cancelado
+    if not needs_compliance_trade():
+        log("Compliance: ya hubo trade hoy, cancelado")
+        return
+
+    # Maximo 2 intentos por dia
+    attempts = get_compliance_attempts_today()
+    if attempts >= 2:
+        log(f"Compliance: 2 intentos ya realizados hoy, cancelado")
+        return
+
+    log(f"No hubo trades hoy. Ejecutando trade de cumplimiento (intento {attempts + 1}/2)...")
+    from modules.trade_executor import compliance_trade
+    success = compliance_trade()
+    log_compliance_trade(success=success)
+    if success:
+        log("Trade de cumplimiento ejecutado correctamente — no se vuelve a intentar")
+    else:
+        remaining = 1 - attempts  # ya se registro este intento
+        if remaining > 0:
+            log("Trade de cumplimiento FALLO — se reintentara una vez mas en el proximo ciclo (5min)")
         else:
-            log("Ya hubo al menos 1 trade hoy, no se necesita compliance trade")
+            log("Trade de cumplimiento FALLO — sin mas intentos hoy")
 
 
 def run_once():

@@ -243,9 +243,10 @@ def evaluate(volume_alert, path="B"):
     # ── PATH WATCHLIST (A): precio subio + volumen = entrada inmediata ────────
     # El TA ya fue validado cuando se agrego a watchlist (RSI, MACD, momentum)
     # En el momento del spike el TA esta contaminado por la suba rapida — no lo usamos como filtro
+    is_breaking = volume_alert.get("breaking_news", False)
     if in_watchlist:
         price_change_pct = volume_alert.get("price_change_pct", 0)
-        if price_change_pct <= 0:
+        if price_change_pct <= 0 and not is_breaking:
             log(f"{symbol} [WATCHLIST] rechazado: precio no subio con el volumen ({price_change_pct:+.2f}%)")
             return None
         log(f"{symbol} [WATCHLIST] precio subio {price_change_pct:+.2f}% con volumen {volume_ratio}x — entrada directa")
@@ -256,7 +257,6 @@ def evaluate(volume_alert, path="B"):
     # ── PATH SPIKE SIN NARRATIVA (B): requiere doble confirmacion clasica ────
     else:
         sentiment = analyze_sentiment(symbol, volume_ratio=volume_ratio)
-        is_breaking = volume_alert.get("breaking_news", False)
         if sentiment["sentiment"] != "POSITIVO" and not is_breaking:
             log(f"{symbol} rechazado: sentimiento {sentiment['sentiment']}, se necesita POSITIVO")
             return None
@@ -282,7 +282,7 @@ def evaluate(volume_alert, path="B"):
         log(f"{symbol} tiene lecciones previas:\n{past_lessons}")
 
     market_bias = None
-    if not in_watchlist:
+    if not in_watchlist or is_breaking:
         market_bias = get_market_bias(symbol, extra_context={
             "ta_analysis": ta_summary_for_claude,
             "in_watchlist": False,
@@ -295,7 +295,7 @@ def evaluate(volume_alert, path="B"):
             if market_bias["action_modifier"] == "REDUCE_SIZE":
                 log(f"{symbol} capital reducido por Claude: {market_bias['reason']}")
                 # Se aplica el 50% de reduccion despues de calculate_position_size
-    else:
+    elif not is_breaking:
         log(f"{symbol} [WATCHLIST] Claude documentara el catalizador post-entrada (no bloquea decision)")
         if past_lessons:
             log(f"{symbol} lecciones previas disponibles para referencia post-entrada")
